@@ -1,0 +1,86 @@
+name: Binary
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -eu
+          mkdir -p out
+          hash=$(git rev-parse HEAD)
+          short=${hash:0:9}
+          export TS_VERSION_LONG="0.0.0-t${short}"
+          export TS_VERSION_GIT_HASH="$hash"
+          ext=""
+          if [ "$GOOS" = "windows" ]; then
+            ext=".exe"
+          fi
+          ./build_dist.sh --box -o "out/inferscale-${GOOS}-${GOARCH}${ext}" ./cmd/tailscaled
+          cp "out/inferscale-${GOOS}-${GOARCH}${ext}" "out/inferscaled-${GOOS}-${GOARCH}${ext}"
+          if [ "$GOOS" = "windows" ]; then
+            curl -fsSL -o wintun.zip https://www.wintun.net/builds/wintun-0.14.1.zip
+            echo "07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51  wintun.zip" | sha256sum -c
+            unzip -p wintun.zip wintun/bin/amd64/wintun.dll > out/wintun.dll
+            zip -j "out/inferscale-windows-amd64.zip" \
+              "out/inferscale-windows-amd64.exe" \
+              "out/inferscaled-windows-amd64.exe" \
+              out/wintun.dll
+            rm -f out/inferscale-windows-amd64.exe out/inferscaled-windows-amd64.exe out/wintun.dll wintun.zip
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inferscale-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: out/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish edge release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          find dist -type f -print
+          gh release view edge >/dev/null 2>&1 || gh release create edge --notes "edge" --latest=false
+          gh release upload edge dist/inferscale-* dist/inferscaled-* --clobber

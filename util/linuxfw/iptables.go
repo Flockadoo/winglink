@@ -218,14 +218,14 @@ func clearRules(proto iptables.Protocol, logf logger.Logf) error {
 		errs = append(errs, err)
 	}
 
-	if err := delChain(ipt, "filter", "ts-input"); err != nil {
+	if err := delChain(ipt, "filter", "is-input"); err != nil {
 		errs = append(errs, err)
 	}
-	if err := delChain(ipt, "filter", "ts-forward"); err != nil {
+	if err := delChain(ipt, "filter", "is-forward"); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := delChain(ipt, "nat", "ts-postrouting"); err != nil {
+	if err := delChain(ipt, "nat", "is-postrouting"); err != nil {
 		errs = append(errs, err)
 	}
 

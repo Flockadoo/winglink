@@ -81,7 +81,7 @@ func (i *iptablesRunner) getIPTByAddr(addr netip.Addr) iptablesInterface {
 // AddLoopbackRule adds an iptables rule to permit loopback traffic to
 // a local Tailscale IP.
 func (i *iptablesRunner) AddLoopbackRule(addr netip.Addr) error {
-	if err := i.getIPTByAddr(addr).Insert("filter", "ts-input", 1, "-i", "lo", "-s", addr.String(), "-j", "ACCEPT"); err != nil {
+	if err := i.getIPTByAddr(addr).Insert("filter", "is-input", 1, "-i", "lo", "-s", addr.String(), "-j", "ACCEPT"); err != nil {
 		return fmt.Errorf("adding loopback allow rule for %q: %w", addr, err)
 	}
 
@@ -91,7 +91,7 @@ func (i *iptablesRunner) AddLoopbackRule(addr netip.Addr) error {
 // tsChain returns the name of the tailscale sub-chain corresponding
 // to the given "parent" chain (e.g. INPUT, FORWARD, ...).
 func tsChain(chain string) string {
-	return "ts-" + strings.ToLower(chain)
+	return "is-" + strings.ToLower(chain)
 }
 
 // DelLoopbackRule removes the iptables rule permitting loopback
@@ -102,14 +102,14 @@ func tsChain(chain string) string {
 func (i *iptablesRunner) DelLoopbackRule(addr netip.Addr) error {
 	ipt := i.getIPTByAddr(addr)
 	args := []string{"-i", "lo", "-s", addr.String(), "-j", "ACCEPT"}
-	exists, err := ipt.Exists("filter", "ts-input", args...)
+	exists, err := ipt.Exists("filter", "is-input", args...)
 	if err != nil {
 		return fmt.Errorf("checking loopback allow rule for %q: %w", addr, err)
 	}
 	if !exists {
 		return nil
 	}
-	if err := ipt.Delete("filter", "ts-input", args...); err != nil {
+	if err := ipt.Delete("filter", "is-input", args...); err != nil {
 		return fmt.Errorf("deleting loopback allow rule for %q: %w", addr, err)
 	}
 
@@ -175,7 +175,7 @@ func (i *iptablesRunner) AddHooks() error {
 }
 
 // AddChains creates custom Tailscale chains in netfilter via iptables
-// if the ts-chain doesn't already exist.
+// if the is-chain doesn't already exist.
 func (i *iptablesRunner) AddChains() error {
 	// create creates a chain in the given table if it doesn't already exist.
 	// If the chain already exists, it is a no-op.
@@ -192,16 +192,16 @@ func (i *iptablesRunner) AddChains() error {
 	}
 
 	for _, ipt := range i.getTables() {
-		if err := create(ipt, "filter", "ts-input"); err != nil {
+		if err := create(ipt, "filter", "is-input"); err != nil {
 			return err
 		}
-		if err := create(ipt, "filter", "ts-forward"); err != nil {
+		if err := create(ipt, "filter", "is-forward"); err != nil {
 			return err
 		}
 	}
 
 	for _, ipt := range i.getNATTables() {
-		if err := create(ipt, "nat", "ts-postrouting"); err != nil {
+		if err := create(ipt, "nat", "is-postrouting"); err != nil {
 			return err
 		}
 	}
@@ -228,8 +228,8 @@ func (i *iptablesRunner) AddBase(tunname string) error {
 func (i *iptablesRunner) addBase4(tunname string) error {
 	// Explicitly allow all inbound traffic to the tun interface
 	args := []string{"-i", tunname, "-j", "ACCEPT"}
-	if err := i.ipt4.Append("filter", "ts-input", args...); err != nil {
-		return fmt.Errorf("adding %v in v4/filter/ts-input: %w", args, err)
+	if err := i.ipt4.Append("filter", "is-input", args...); err != nil {
+		return fmt.Errorf("adding %v in v4/filter/is-input: %w", args, err)
 	}
 
 	// Forward all traffic from the Tailscale interface, and drop
@@ -244,20 +244,20 @@ func (i *iptablesRunner) addBase4(tunname string) error {
 	// filter/FORWARD, and set a packet mark that nat/POSTROUTING can
 	// use to effectively run that same test again.
 	args = []string{"-i", tunname, "-j", "MARK", "--set-mark", subnetRouteMark + "/" + fwmarkMask}
-	if err := i.ipt4.Append("filter", "ts-forward", args...); err != nil {
-		return fmt.Errorf("adding %v in v4/filter/ts-forward: %w", args, err)
+	if err := i.ipt4.Append("filter", "is-forward", args...); err != nil {
+		return fmt.Errorf("adding %v in v4/filter/is-forward: %w", args, err)
 	}
 	args = []string{"-m", "mark", "--mark", subnetRouteMark + "/" + fwmarkMask, "-j", "ACCEPT"}
-	if err := i.ipt4.Append("filter", "ts-forward", args...); err != nil {
-		return fmt.Errorf("adding %v in v4/filter/ts-forward: %w", args, err)
+	if err := i.ipt4.Append("filter", "is-forward", args...); err != nil {
+		return fmt.Errorf("adding %v in v4/filter/is-forward: %w", args, err)
 	}
 	args = []string{"-o", tunname, "-s", tsaddr.CGNATRange().String(), "-j", "DROP"}
-	if err := i.ipt4.Append("filter", "ts-forward", args...); err != nil {
-		return fmt.Errorf("adding %v in v4/filter/ts-forward: %w", args, err)
+	if err := i.ipt4.Append("filter", "is-forward", args...); err != nil {
+		return fmt.Errorf("adding %v in v4/filter/is-forward: %w", args, err)
 	}
 	args = []string{"-o", tunname, "-j", "ACCEPT"}
-	if err := i.ipt4.Append("filter", "ts-forward", args...); err != nil {
-		return fmt.Errorf("adding %v in v4/filter/ts-forward: %w", args, err)
+	if err := i.ipt4.Append("filter", "is-forward", args...); err != nil {
+		return fmt.Errorf("adding %v in v4/filter/is-forward: %w", args, err)
 	}
 
 	return nil
@@ -354,23 +354,23 @@ func (i *iptablesRunner) addBase6(tunname string) error {
 
 	// Explicitly allow all other inbound traffic to the tun interface
 	args := []string{"-i", tunname, "-j", "ACCEPT"}
-	if err := i.ipt6.Append("filter", "ts-input", args...); err != nil {
-		return fmt.Errorf("adding %v in v6/filter/ts-input: %w", args, err)
+	if err := i.ipt6.Append("filter", "is-input", args...); err != nil {
+		return fmt.Errorf("adding %v in v6/filter/is-input: %w", args, err)
 	}
 
 	args = []string{"-i", tunname, "-j", "MARK", "--set-mark", subnetRouteMark + "/" + fwmarkMask}
-	if err := i.ipt6.Append("filter", "ts-forward", args...); err != nil {
-		return fmt.Errorf("adding %v in v6/filter/ts-forward: %w", args, err)
+	if err := i.ipt6.Append("filter", "is-forward", args...); err != nil {
+		return fmt.Errorf("adding %v in v6/filter/is-forward: %w", args, err)
 	}
 	args = []string{"-m", "mark", "--mark", subnetRouteMark + "/" + fwmarkMask, "-j", "ACCEPT"}
-	if err := i.ipt6.Append("filter", "ts-forward", args...); err != nil {
-		return fmt.Errorf("adding %v in v6/filter/ts-forward: %w", args, err)
+	if err := i.ipt6.Append("filter", "is-forward", args...); err != nil {
+		return fmt.Errorf("adding %v in v6/filter/is-forward: %w", args, err)
 	}
 	// TODO: drop forwarded traffic to tailscale0 from tailscale's ULA
 	// (see corresponding IPv4 CGNAT rule).
 	args = []string{"-o", tunname, "-j", "ACCEPT"}
-	if err := i.ipt6.Append("filter", "ts-forward", args...); err != nil {
-		return fmt.Errorf("adding %v in v6/filter/ts-forward: %w", args, err)
+	if err := i.ipt6.Append("filter", "is-forward", args...); err != nil {
+		return fmt.Errorf("adding %v in v6/filter/is-forward: %w", args, err)
 	}
 
 	return nil
@@ -379,16 +379,16 @@ func (i *iptablesRunner) addBase6(tunname string) error {
 // DelChains removes the custom Tailscale chains from netfilter via iptables.
 func (i *iptablesRunner) DelChains() error {
 	for _, ipt := range i.getTables() {
-		if err := delChain(ipt, "filter", "ts-input"); err != nil {
+		if err := delChain(ipt, "filter", "is-input"); err != nil {
 			return err
 		}
-		if err := delChain(ipt, "filter", "ts-forward"); err != nil {
+		if err := delChain(ipt, "filter", "is-forward"); err != nil {
 			return err
 		}
 	}
 
 	for _, ipt := range i.getNATTables() {
-		if err := delChain(ipt, "nat", "ts-postrouting"); err != nil {
+		if err := delChain(ipt, "nat", "is-postrouting"); err != nil {
 			return err
 		}
 	}
@@ -412,15 +412,15 @@ func (i *iptablesRunner) DelBase() error {
 	}
 
 	for _, ipt := range i.getTables() {
-		if err := del(ipt, "filter", "ts-input"); err != nil {
+		if err := del(ipt, "filter", "is-input"); err != nil {
 			return err
 		}
-		if err := del(ipt, "filter", "ts-forward"); err != nil {
+		if err := del(ipt, "filter", "is-forward"); err != nil {
 			return err
 		}
 	}
 	for _, ipt := range i.getNATTables() {
-		if err := del(ipt, "nat", "ts-postrouting"); err != nil {
+		if err := del(ipt, "nat", "is-postrouting"); err != nil {
 			return err
 		}
 	}
@@ -453,8 +453,8 @@ func (i *iptablesRunner) DelHooks(logf logger.Logf) error {
 func (i *iptablesRunner) AddSNATRule() error {
 	args := []string{"-m", "mark", "--mark", subnetRouteMark + "/" + fwmarkMask, "-j", "MASQUERADE"}
 	for _, ipt := range i.getNATTables() {
-		if err := ipt.Append("nat", "ts-postrouting", args...); err != nil {
-			return fmt.Errorf("adding %v in nat/ts-postrouting: %w", args, err)
+		if err := ipt.Append("nat", "is-postrouting", args...); err != nil {
+			return fmt.Errorf("adding %v in nat/is-postrouting: %w", args, err)
 		}
 	}
 	return nil
@@ -465,8 +465,8 @@ func (i *iptablesRunner) AddSNATRule() error {
 func (i *iptablesRunner) DelSNATRule() error {
 	args := []string{"-m", "mark", "--mark", subnetRouteMark + "/" + fwmarkMask, "-j", "MASQUERADE"}
 	for _, ipt := range i.getNATTables() {
-		if err := ipt.Delete("nat", "ts-postrouting", args...); err != nil {
-			return fmt.Errorf("deleting %v in nat/ts-postrouting: %w", args, err)
+		if err := ipt.Delete("nat", "is-postrouting", args...); err != nil {
+			return fmt.Errorf("deleting %v in nat/is-postrouting: %w", args, err)
 		}
 	}
 	return nil
@@ -503,19 +503,19 @@ func (i *iptablesRunner) AddStatefulRule(tunname string) error {
 	args := statefulRuleArgs(tunname)
 	for _, ipt := range i.getTables() {
 		// First, find the final "accept" rule.
-		rules, err := ipt.List("filter", "ts-forward")
+		rules, err := ipt.List("filter", "is-forward")
 		if err != nil {
-			return fmt.Errorf("listing rules in filter/ts-forward: %w", err)
+			return fmt.Errorf("listing rules in filter/is-forward: %w", err)
 		}
-		want := fmt.Sprintf("-A %s -o %s -j ACCEPT", "ts-forward", tunname)
+		want := fmt.Sprintf("-A %s -o %s -j ACCEPT", "is-forward", tunname)
 
 		pos := slices.Index(rules, want)
 		if pos < 0 {
-			return fmt.Errorf("couldn't find final ACCEPT rule in filter/ts-forward")
+			return fmt.Errorf("couldn't find final ACCEPT rule in filter/is-forward")
 		}
 
-		if err := ipt.Insert("filter", "ts-forward", pos, args...); err != nil {
-			return fmt.Errorf("adding %v in filter/ts-forward: %w", args, err)
+		if err := ipt.Insert("filter", "is-forward", pos, args...); err != nil {
+			return fmt.Errorf("adding %v in filter/is-forward: %w", args, err)
 		}
 	}
 	return nil
@@ -526,8 +526,8 @@ func (i *iptablesRunner) AddStatefulRule(tunname string) error {
 func (i *iptablesRunner) DelStatefulRule(tunname string) error {
 	args := statefulRuleArgs(tunname)
 	for _, ipt := range i.getTables() {
-		if err := ipt.Delete("filter", "ts-forward", args...); err != nil {
-			return fmt.Errorf("deleting %v in filter/ts-forward: %w", args, err)
+		if err := ipt.Delete("filter", "is-forward", args...); err != nil {
+			return fmt.Errorf("deleting %v in filter/is-forward: %w", args, err)
 		}
 	}
 	return nil
@@ -663,8 +663,8 @@ func (i *iptablesRunner) AddMagicsockPortRule(port uint16, network string) error
 
 	args := buildMagicsockPortRule(port)
 
-	if err := ipt.Append("filter", "ts-input", args...); err != nil {
-		return fmt.Errorf("adding %v in filter/ts-input: %w", args, err)
+	if err := ipt.Append("filter", "is-input", args...); err != nil {
+		return fmt.Errorf("adding %v in filter/is-input: %w", args, err)
 	}
 
 	return nil
@@ -687,8 +687,8 @@ func (i *iptablesRunner) DelMagicsockPortRule(port uint16, network string) error
 
 	args := buildMagicsockPortRule(port)
 
-	if err := ipt.Delete("filter", "ts-input", args...); err != nil {
-		return fmt.Errorf("removing %v in filter/ts-input: %w", args, err)
+	if err := ipt.Delete("filter", "is-input", args...); err != nil {
+		return fmt.Errorf("removing %v in filter/is-input: %w", args, err)
 	}
 
 	return nil
@@ -718,7 +718,7 @@ func buildExternalCGNATRules(mode CGNATMode, tunname string) ([][]string, error)
 	}
 }
 
-// AddExternalCGNATRules adds rules to the ts-input chain to deal with
+// AddExternalCGNATRules adds rules to the is-input chain to deal with
 // traffic from the CGNAT range that arrives on non-Tailscale network
 // interfaces.
 func (i *iptablesRunner) AddExternalCGNATRules(mode CGNATMode, tunname string) error {
@@ -727,8 +727,8 @@ func (i *iptablesRunner) AddExternalCGNATRules(mode CGNATMode, tunname string) e
 		return fmt.Errorf("build cgnat mode rule: %v", err)
 	}
 	for _, rule := range rules {
-		if err := i.ipt4.Append("filter", "ts-input", rule...); err != nil {
-			return fmt.Errorf("adding %v in v4/filter/ts-input: %w", rule, err)
+		if err := i.ipt4.Append("filter", "is-input", rule...); err != nil {
+			return fmt.Errorf("adding %v in v4/filter/is-input: %w", rule, err)
 		}
 	}
 	return nil
@@ -742,20 +742,20 @@ func (i *iptablesRunner) DelExternalCGNATRules(mode CGNATMode, tunname string) e
 		return fmt.Errorf("build cgnat mode rule: %v", err)
 	}
 	for _, rule := range rules {
-		if found, err := i.ipt4.Exists("filter", "ts-input", rule...); err != nil {
-			return fmt.Errorf("checking for %v in v4/filter/ts-input: %w", rule, err)
+		if found, err := i.ipt4.Exists("filter", "is-input", rule...); err != nil {
+			return fmt.Errorf("checking for %v in v4/filter/is-input: %w", rule, err)
 		} else if !found {
 			// Don't need to delete a rule that isn't there.
 			continue
 		}
-		if err := i.ipt4.Delete("filter", "ts-input", rule...); err != nil {
-			return fmt.Errorf("deleting %v in v4/filter/ts-input: %w", rule, err)
+		if err := i.ipt4.Delete("filter", "is-input", rule...); err != nil {
+			return fmt.Errorf("deleting %v in v4/filter/is-input: %w", rule, err)
 		}
 	}
 	return nil
 }
 
-// delTSHook deletes hook in a chain that jumps to a ts-chain. If the hook does not
+// delTSHook deletes hook in a chain that jumps to a is-chain. If the hook does not
 // exist, it's a no-op since the desired state is already achieved but we log the
 // error because error code from the iptables module resists unwrapping.
 func delTSHook(ipt iptablesInterface, table, chain string, logf logger.Logf) error {

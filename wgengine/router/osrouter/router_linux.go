@@ -138,7 +138,7 @@ func newUserspaceRouterAdvanced(logf logger.Logf, tunname string, netMon *netmon
 		cmd: cmd,
 
 		ipRuleFixLimiter: rate.NewLimiter(rate.Every(5*time.Second), 10),
-		ipPolicyPrefBase: 5200,
+		ipPolicyPrefBase: 5300,
 	}
 	r.interfaceV6Usable = func() bool { return interfaceV6UsableForTun(r.tunname) }
 	ec := bus.Client("router-linux")
@@ -1555,23 +1555,10 @@ var (
 	mainRouteTable    = newRouteTable("main", 254)
 	defaultRouteTable = newRouteTable("default", 253)
 
-	// tailscaleRouteTable is the routing table number for Tailscale
-	// network routes. See addIPRules for the detailed policy routing
-	// logic that ends up doing lookups within that table.
-	//
-	// NOTE(danderson): We chose 52 because those are the digits above the
-	// letters "TS" on a qwerty keyboard, and 52 is sufficiently unlikely
-	// to be picked by other software.
-	//
-	// NOTE(danderson): You might wonder why we didn't pick some
-	// high table number like 5252, to further avoid the potential
-	// for collisions with other software. Unfortunately,
-	// Busybox's `ip` implementation believes that table numbers
-	// are 8-bit integers, so for maximum compatibility we had to
-	// stay in the 0-255 range even though linux itself supports
-	// larger numbers. (but nowadays we use netlink directly and
-	// aren't affected by the busybox binary's limitations)
-	tailscaleRouteTable = newRouteTable("tailscale", 52)
+	// Not 52. Tailscale owns table 52, and each daemon flushes the
+	// table it thinks is its own. Stay under 256: busybox `ip` treats
+	// table numbers as 8-bit.
+	tailscaleRouteTable = newRouteTable("inferscale", 87)
 )
 
 // baseIPRules are the policy routing rules that Tailscale uses, when not

@@ -229,5 +229,16 @@ func clearRules(proto iptables.Protocol, logf logger.Logf) error {
 		errs = append(errs, err)
 	}
 
+	// The connmark chains (AddConnmarkSaveRule), which a daemon that did
+	// not shut down cleanly leaves behind.
+	for _, r := range connmarkRules() {
+		if err := delTSHook(ipt, "mangle", r.builtin, logf); err != nil {
+			errs = append(errs, err)
+		}
+		if err := delChain(ipt, "mangle", r.chain); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	return errors.Join(errs...)
 }

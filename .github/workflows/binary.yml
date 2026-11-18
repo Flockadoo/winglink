@@ -124,7 +124,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: app
-        uses: actions/create-github-app-token@v1
+        # v1 targets Node.js 20. Runners force that onto Node.js 24, and the
+        # private-key import then fails with Invalid keyData. v3 runs on Node 24.
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.CLIENT_PIN_APP_ID }}
           private-key: ${{ secrets.CLIENT_PIN_APP_PRIVATE_KEY }}

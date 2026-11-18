@@ -1,9 +1,10 @@
 name: Test
 
-# The firewall code is where Inferscale differs most from Tailscale (chain
-# names, packet marks, address range), and it runs as root on providers'
-# machines. Its tests run on every pull request and on main. Other packages
-# join this list as their tests are brought up to the fork.
+# The firewall and routing code is where Inferscale differs most from
+# Tailscale (chain names, packet marks, routing table, address ranges), and it
+# runs as root on providers' machines. Its tests run on every pull request and
+# on main. Other packages join this list as their tests are brought up to the
+# fork.
 
 on:
   pull_request:
@@ -23,5 +24,17 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Firewall tests
-        run: go test -count=1 ./util/linuxfw/
+      - name: Firewall and router tests
+        run: go test -count=1 ./util/linuxfw/ ./wgengine/router/...
+
+      # Three router tests need root and a TUN device, and skip without them.
+      # They run in a network namespace of their own, so they cannot touch the
+      # runner's network.
+      - name: Router tests that need root
+        run: |
+          set -eu
+          go test -c -o "$RUNNER_TEMP/osrouter.test" ./wgengine/router/osrouter/
+          sudo unshare -n "$RUNNER_TEMP/osrouter.test" -test.count=1 -test.v \
+            -test.run '^(TestRuleDeletedEvent|TestDelRouteIdempotent|TestAddRemoveRules)$' | tee "$RUNNER_TEMP/root-tests.txt"
+          # A skip here means the tests did not run: fail.
+          ! grep -q -- '--- SKIP' "$RUNNER_TEMP/root-tests.txt"

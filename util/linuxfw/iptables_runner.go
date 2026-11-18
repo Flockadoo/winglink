@@ -544,11 +544,14 @@ func (i *iptablesRunner) AddConnmarkSaveRule() error {
 		if err != nil {
 			continue
 		}
-		// Look for existing connmark restore rule
+		// Look for our own connmark restore rule. The mask has to be a
+		// whole argument: "0xff0000" is a prefix of "0xff000000", so a
+		// substring check treats Tailscale's rule as ours and skips the
+		// save/restore that subnet routers and exit nodes need.
 		for _, rule := range rules {
 			if strings.Contains(rule, "CONNMARK") &&
 				strings.Contains(rule, "restore-mark") &&
-				strings.Contains(rule, "ctmask 0xff0000") {
+				iptablesRuleHasArg(rule, "--ctmask "+fwmarkMask) {
 				// Rules already exist, skip adding
 				return nil
 			}
@@ -593,6 +596,12 @@ func (i *iptablesRunner) AddConnmarkSaveRule() error {
 	}
 
 	return nil
+}
+
+// iptablesRuleHasArg reports whether rule, an iptables listing of
+// space-separated arguments, contains arg as one whole argument.
+func iptablesRuleHasArg(rule, arg string) bool {
+	return strings.Contains(" "+rule+" ", " "+arg+" ")
 }
 
 // DelConnmarkSaveRule removes conntrack marking rules added by AddConnmarkSaveRule.

@@ -368,20 +368,33 @@ func TestAddAndDelConnmarkSaveRule(t *testing.T) {
 		"-m", "conntrack",
 		"--ctstate", "ESTABLISHED,RELATED",
 		"-m", "connmark",
-		"!", "--mark", "0x0/0xff0000",
+		"!", "--mark", "0x0/" + fwmarkMask,
 		"-j", "CONNMARK",
 		"--restore-mark",
-		"--nfmask", "0xff0000",
-		"--ctmask", "0xff0000",
+		"--nfmask", fwmarkMask,
+		"--ctmask", fwmarkMask,
 	}
 
 	outputArgs := []string{
 		"-m", "conntrack",
 		"--ctstate", "NEW",
 		"-m", "mark",
-		"!", "--mark", "0x0/0xff0000",
+		"!", "--mark", "0x0/" + fwmarkMask,
 		"-j", "CONNMARK",
 		"--save-mark",
+		"--nfmask", fwmarkMask,
+		"--ctmask", fwmarkMask,
+	}
+
+	// Tailscale's connmark rule uses the third byte. It must not satisfy
+	// the idempotency check, or Inferscale never installs its own.
+	tailscalePrerouting := []string{
+		"-m", "conntrack",
+		"--ctstate", "ESTABLISHED,RELATED",
+		"-m", "connmark",
+		"!", "--mark", "0x0/0xff0000",
+		"-j", "CONNMARK",
+		"--restore-mark",
 		"--nfmask", "0xff0000",
 		"--ctmask", "0xff0000",
 	}
@@ -501,6 +514,68 @@ func TestAddAndDelConnmarkSaveRule(t *testing.T) {
 			t.Fatalf("error checking IPv4 OUTPUT rule: %v", err)
 		} else if exists {
 			t.Errorf("IPv4 OUTPUT connmark rule still exists after deletion")
+		}
+	})
+
+	t.Run("tailscale_rule_is_not_ours", func(t *testing.T) {
+		iptr := newFakeIPTablesRunner()
+		if err := iptr.ipt4.Append("mangle", "PREROUTING", tailscalePrerouting...); err != nil {
+			t.Fatal(err)
+		}
+		if err := iptr.ipt6.Append("mangle", "PREROUTING", tailscalePrerouting...); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := iptr.AddConnmarkSaveRule(); err != nil {
+			t.Fatalf("AddConnmarkSaveRule failed: %v", err)
+		}
+
+		for _, proto := range []iptablesInterface{iptr.ipt4, iptr.ipt6} {
+			exists, err := proto.Exists("mangle", "PREROUTING", preroutingArgs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !exists {
+				t.Error("Inferscale PREROUTING connmark rule was not added next to Tailscale's")
+			}
+			exists, err = proto.Exists("mangle", "OUTPUT", outputArgs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !exists {
+				t.Error("Inferscale OUTPUT connmark rule was not added")
+			}
+
+			rules, err := proto.List("mangle", "PREROUTING")
+			if err != nil {
+				t.Fatal(err)
+			}
+			restores := 0
+			for _, rule := range rules {
+				if strings.Contains(rule, "restore-mark") {
+					restores++
+				}
+			}
+			if restores != 2 {
+				t.Errorf("PREROUTING restore rules = %d, want Tailscale's and Inferscale's", restores)
+			}
+		}
+
+		if err := iptr.AddConnmarkSaveRule(); err != nil {
+			t.Fatalf("AddConnmarkSaveRule (second call) failed: %v", err)
+		}
+		rules, err := iptr.ipt4.List("mangle", "PREROUTING")
+		if err != nil {
+			t.Fatal(err)
+		}
+		restores := 0
+		for _, rule := range rules {
+			if strings.Contains(rule, "restore-mark") {
+				restores++
+			}
+		}
+		if restores != 2 {
+			t.Errorf("second call duplicated the rule: %d restore rules", restores)
 		}
 	})
 }

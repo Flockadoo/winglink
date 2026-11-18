@@ -533,41 +533,33 @@ func (i *iptablesRunner) DelStatefulRule(tunname string) error {
 	return nil
 }
 
-// AddConnmarkSaveRule adds conntrack marking rules to save and restore marks.
-// These rules run in mangle/PREROUTING (to restore marks from conntrack) and
-// mangle/OUTPUT (to save marks to conntrack) before rp_filter checks, enabling
-// proper routing table lookups for exit nodes and subnet routers.
-func (i *iptablesRunner) AddConnmarkSaveRule() error {
-	// Each rule is added unless that exact rule is already in its chain, in
-	// each table on its own (insertIfMissing). The exact rule matters:
-	// Tailscale installs the same two rules with its own mask, 0xff0000,
-	// which is also how the text of Inferscale's mask begins. Searching the
-	// listing for the mask took Tailscale's rule for ours, and beside
-	// Tailscale these rules were never added.
+// connmarkRule is one of the two connmark rules and where it goes: chain is
+// one of Inferscale's own in the mangle table, reached by a jump at the top of
+// the built-in chain.
+type connmarkRule struct {
+	builtin, chain string
+	args           []string
+}
 
-	// mangle/PREROUTING: Restore mark from conntrack for ESTABLISHED/RELATED connections
-	// This runs BEFORE routing decision and rp_filter check
-	// The connmark check ensures we only restore when Tailscale has marked the connection,
-	// preventing us from wiping mark bits set by other systems when ct mark is zero.
-	for _, ipt := range i.getTables() {
-		args := []string{
+func connmarkRules() []connmarkRule {
+	return []connmarkRule{
+		// Restore the mark from conntrack for ESTABLISHED/RELATED connections.
+		// This runs BEFORE the routing decision and the rp_filter check. The
+		// connmark match restores only when Inferscale marked the connection,
+		// so mark bits set by other systems are not wiped when the ct mark is
+		// zero.
+		{"PREROUTING", tsChain("PREROUTING"), []string{
 			"-m", "conntrack",
 			"--ctstate", "ESTABLISHED,RELATED",
 			"-m", "connmark",
-			"!", "--mark", "0x0/" + fwmarkMask, // Only restore if ct mark has Tailscale bits set
+			"!", "--mark", "0x0/" + fwmarkMask,
 			"-j", "CONNMARK",
 			"--restore-mark",
 			"--nfmask", fwmarkMask,
 			"--ctmask", fwmarkMask,
-		}
-		if err := insertIfMissing(ipt, "mangle", "PREROUTING", args); err != nil {
-			return err
-		}
-	}
-
-	// mangle/OUTPUT: Save mark to conntrack for NEW connections with non-zero marks
-	for _, ipt := range i.getTables() {
-		args := []string{
+		}},
+		// Save the mark to conntrack for NEW connections with a non-zero mark.
+		{"OUTPUT", tsChain("OUTPUT"), []string{
 			"-m", "conntrack",
 			"--ctstate", "NEW",
 			"-m", "mark",
@@ -576,12 +568,54 @@ func (i *iptablesRunner) AddConnmarkSaveRule() error {
 			"--save-mark",
 			"--nfmask", fwmarkMask,
 			"--ctmask", fwmarkMask,
-		}
-		if err := insertIfMissing(ipt, "mangle", "OUTPUT", args); err != nil {
-			return err
+		}},
+	}
+}
+
+// AddConnmarkSaveRule adds conntrack marking rules to save and restore marks.
+// They take effect in mangle/PREROUTING (to restore marks from conntrack) and
+// mangle/OUTPUT (to save marks to conntrack) before rp_filter checks, enabling
+// proper routing table lookups for exit nodes and subnet routers.
+//
+// The rules are in chains of Inferscale's own, each reached by one jump from
+// the built-in chain, and nothing else of Inferscale's is in the built-in
+// chains. Tailscale decides whether its own connmark rules are installed by
+// searching the listing of mangle/PREROUTING for the text "ctmask 0xff0000",
+// and the text of Inferscale's mask, 0xff000000, begins with that: a rule of
+// ours in that chain made a tailscaled on the same host skip its own rules.
+// For the same reason nothing here looks for a rule by its text; iptables is
+// asked for the exact rule.
+func (i *iptablesRunner) AddConnmarkSaveRule() error {
+	for _, ipt := range i.getTables() {
+		for _, r := range connmarkRules() {
+			// A build from before these chains left the rule in the built-in
+			// chain.
+			if err := ipt.Delete("mangle", r.builtin, r.args...); err != nil && !isNotExistError(err) {
+				return fmt.Errorf("deleting %v in mangle/%s: %w", r.args, r.builtin, err)
+			}
+			if err := flushOrCreateChain(ipt, "mangle", r.chain); err != nil {
+				return err
+			}
+			if err := ipt.Append("mangle", r.chain, r.args...); err != nil {
+				return fmt.Errorf("adding %v in mangle/%s: %w", r.args, r.chain, err)
+			}
+			if err := insertIfMissing(ipt, "mangle", r.builtin, []string{"-j", r.chain}); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
+}
 
+// flushOrCreateChain leaves table/chain existing and empty.
+func flushOrCreateChain(ipt iptablesInterface, table, chain string) error {
+	err := ipt.ClearChain(table, chain)
+	if err != nil && isNotExistError(err) {
+		err = ipt.NewChain(table, chain)
+	}
+	if err != nil {
+		return fmt.Errorf("setting up %s/%s: %w", table, chain, err)
+	}
 	return nil
 }
 
@@ -601,43 +635,22 @@ func insertIfMissing(ipt iptablesInterface, table, chain string, args []string) 
 	return nil
 }
 
-// DelConnmarkSaveRule removes conntrack marking rules added by AddConnmarkSaveRule.
+// DelConnmarkSaveRule removes what AddConnmarkSaveRule added: the jumps and
+// the chains, and a rule an older build left in a built-in chain. Nothing
+// being there is not an error.
 func (i *iptablesRunner) DelConnmarkSaveRule() error {
 	for _, ipt := range i.getTables() {
-		// Delete PREROUTING rule
-		args := []string{
-			"-m", "conntrack",
-			"--ctstate", "ESTABLISHED,RELATED",
-			"-m", "connmark",
-			"!", "--mark", "0x0/" + fwmarkMask,
-			"-j", "CONNMARK",
-			"--restore-mark",
-			"--nfmask", fwmarkMask,
-			"--ctmask", fwmarkMask,
-		}
-		if err := ipt.Delete("mangle", "PREROUTING", args...); err != nil {
-			if !isNotExistError(err) {
-				return fmt.Errorf("deleting connmark rule in mangle/PREROUTING: %w", err)
+		for _, r := range connmarkRules() {
+			jump := []string{"-j", r.chain}
+			if err := ipt.Delete("mangle", r.builtin, jump...); err != nil && !isNotExistError(err) {
+				return fmt.Errorf("deleting %v in mangle/%s: %w", jump, r.builtin, err)
 			}
-			// Rule doesn't exist - this is fine for idempotency
-		}
-
-		// Delete OUTPUT rule
-		args = []string{
-			"-m", "conntrack",
-			"--ctstate", "NEW",
-			"-m", "mark",
-			"!", "--mark", "0x0/" + fwmarkMask,
-			"-j", "CONNMARK",
-			"--save-mark",
-			"--nfmask", fwmarkMask,
-			"--ctmask", fwmarkMask,
-		}
-		if err := ipt.Delete("mangle", "OUTPUT", args...); err != nil {
-			if !isNotExistError(err) {
-				return fmt.Errorf("deleting connmark rule in mangle/OUTPUT: %w", err)
+			if err := delChain(ipt, "mangle", r.chain); err != nil {
+				return err
 			}
-			// Rule doesn't exist - this is fine for idempotency
+			if err := ipt.Delete("mangle", r.builtin, r.args...); err != nil && !isNotExistError(err) {
+				return fmt.Errorf("deleting connmark rule in mangle/%s: %w", r.builtin, err)
+			}
 		}
 	}
 	return nil

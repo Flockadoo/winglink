@@ -68,8 +68,14 @@ jobs:
           if-no-files-found: error
 
   publish:
+    # Every push to main publishes the binaries twice: to edge, overwritten
+    # each time as before, and to a release of its own, v0.0.<run number>,
+    # never overwritten, with a SHA256SUMS file. Clients pin the versioned
+    # release and the checksums (inferoute-client plan item S1).
     needs: build
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -77,6 +83,29 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      - name: Checksums
+        run: |
+          set -eu
+          cd dist
+          sha256sum inferscale-* inferscaled-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - id: version
+        run: echo "version=v0.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the versioned release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          # A version is never reused or overwritten: no --clobber, and an
+          # existing release of this name stops the job.
+          gh release create "$VERSION" dist/inferscale-* dist/inferscaled-* dist/SHA256SUMS \
+            --target "$GITHUB_SHA" --title "Inferscale $VERSION" --latest=false \
+            --notes "Built from $GITHUB_SHA by $RUN_URL"
 
       - name: Publish edge release
         env:
@@ -86,3 +115,72 @@ jobs:
           find dist -type f -print
           gh release view edge >/dev/null 2>&1 || gh release create edge --notes "edge" --latest=false
           gh release upload edge dist/inferscale-* dist/inferscaled-* --clobber
+
+  pin:
+    # Opens a pull request in inferoute-client that pins this release. The
+    # app's token can push a branch and open a pull request there and nothing
+    # else; only a maintainer merges it.
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.CLIENT_PIN_APP_ID }}
+          private-key: ${{ secrets.CLIENT_PIN_APP_PRIVATE_KEY }}
+          owner: Inferoute
+          repositories: inferoute-client
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Fetch the checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: gh release download "$VERSION" -p SHA256SUMS -R "$GITHUB_REPOSITORY"
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Inferoute/inferoute-client
+          ref: main
+          token: ${{ steps.app.outputs.token }}
+          path: client
+
+      - name: Write the pin and open the pull request
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          VERSION: ${{ needs.publish.outputs.version }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.publish.outputs.version }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          jq -n --arg v "$VERSION" --arg c "$GITHUB_SHA" --rawfile sums SHA256SUMS \
+            '{version: $v, commit: $c, sha256: ($sums | split("\n") | map(select(length > 0) | split("  ") | {(.[1]): .[0]}) | add)}' \
+            > client/pkg/inferscale/release.json
+          {
+            echo "Pins Inferscale $VERSION in the client."
+            echo
+            echo "- Release: $RELEASE_URL"
+            echo "- Source commit: $COMMIT_URL"
+            echo "- Built and published by: $RUN_URL"
+            echo "- Platforms: Linux amd64 and arm64, macOS amd64 and arm64, Windows amd64 (zip)"
+            echo
+            echo "Checksums:"
+            echo
+            echo '```'
+            cat SHA256SUMS
+            echo '```'
+            echo
+            echo "Opened by the Inferscale release workflow. Review it against the release above and merge only if you expected it. The Inferscale pin check compares every file with the release."
+          } > body.md
+          cd client
+          branch="inferscale-pin/$VERSION"
+          git config user.name "$SLUG[bot]"
+          git config user.email "$SLUG[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add pkg/inferscale/release.json
+          git commit -m "Pin Inferscale $VERSION"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Pin Inferscale $VERSION" --body-file ../body.md

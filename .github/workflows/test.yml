@@ -1,0 +1,27 @@
+name: Test
+
+# The firewall code is where Inferscale differs most from Tailscale (chain
+# names, packet marks, address range), and it runs as root on providers'
+# machines. Its tests run on every pull request and on main. Other packages
+# join this list as their tests are brought up to the fork.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  firewall:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Firewall tests
+        run: go test -count=1 ./util/linuxfw/

@@ -538,22 +538,12 @@ func (i *iptablesRunner) DelStatefulRule(tunname string) error {
 // mangle/OUTPUT (to save marks to conntrack) before rp_filter checks, enabling
 // proper routing table lookups for exit nodes and subnet routers.
 func (i *iptablesRunner) AddConnmarkSaveRule() error {
-	// Check if rules already exist (idempotency)
-	for _, ipt := range i.getTables() {
-		rules, err := ipt.List("mangle", "PREROUTING")
-		if err != nil {
-			continue
-		}
-		// Look for existing connmark restore rule
-		for _, rule := range rules {
-			if strings.Contains(rule, "CONNMARK") &&
-				strings.Contains(rule, "restore-mark") &&
-				strings.Contains(rule, "ctmask 0xff0000") {
-				// Rules already exist, skip adding
-				return nil
-			}
-		}
-	}
+	// Each rule is added unless that exact rule is already in its chain, in
+	// each table on its own (insertIfMissing). The exact rule matters:
+	// Tailscale installs the same two rules with its own mask, 0xff0000,
+	// which is also how the text of Inferscale's mask begins. Searching the
+	// listing for the mask took Tailscale's rule for ours, and beside
+	// Tailscale these rules were never added.
 
 	// mangle/PREROUTING: Restore mark from conntrack for ESTABLISHED/RELATED connections
 	// This runs BEFORE routing decision and rp_filter check
@@ -570,8 +560,8 @@ func (i *iptablesRunner) AddConnmarkSaveRule() error {
 			"--nfmask", fwmarkMask,
 			"--ctmask", fwmarkMask,
 		}
-		if err := ipt.Insert("mangle", "PREROUTING", 1, args...); err != nil {
-			return fmt.Errorf("adding %v in mangle/PREROUTING: %w", args, err)
+		if err := insertIfMissing(ipt, "mangle", "PREROUTING", args); err != nil {
+			return err
 		}
 	}
 
@@ -587,11 +577,27 @@ func (i *iptablesRunner) AddConnmarkSaveRule() error {
 			"--nfmask", fwmarkMask,
 			"--ctmask", fwmarkMask,
 		}
-		if err := ipt.Insert("mangle", "OUTPUT", 1, args...); err != nil {
-			return fmt.Errorf("adding %v in mangle/OUTPUT: %w", args, err)
+		if err := insertIfMissing(ipt, "mangle", "OUTPUT", args); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+// insertIfMissing puts the rule first in table/chain, unless that exact rule
+// is already in the chain.
+func insertIfMissing(ipt iptablesInterface, table, chain string, args []string) error {
+	exists, err := ipt.Exists(table, chain, args...)
+	if err != nil {
+		return fmt.Errorf("checking for %v in %s/%s: %w", args, table, chain, err)
+	}
+	if exists {
+		return nil
+	}
+	if err := ipt.Insert(table, chain, 1, args...); err != nil {
+		return fmt.Errorf("adding %v in %s/%s: %w", args, table, chain, err)
+	}
 	return nil
 }
 

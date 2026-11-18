@@ -363,154 +363,75 @@ func checkSNATRuleCount(t *testing.T, iptr *iptablesRunner, ip netip.Addr, wants
 	}
 }
 
+// tailscaleSeesItsConnmarkRule is Tailscale's own check, copied from
+// AddConnmarkSaveRule in tailscale.com/util/linuxfw/iptables_runner.go
+// (upstream main, November 2026). When it is true, tailscaled concludes its
+// connmark rules are installed and adds none.
+func tailscaleSeesItsConnmarkRule(t *testing.T, ipt iptablesInterface) bool {
+	t.Helper()
+	rules, err := ipt.List("mangle", "PREROUTING")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rule := range rules {
+		if strings.Contains(rule, "CONNMARK") &&
+			strings.Contains(rule, "restore-mark") &&
+			strings.Contains(rule, "ctmask 0xff0000") {
+			return true
+		}
+	}
+	return false
+}
+
+// Inferscale's two connmark rules live in chains of its own in the mangle
+// table, is-prerouting and is-output, each reached by one jump at the top of
+// the built-in chain. Nothing else of Inferscale's is in the built-in
+// chains. Tailscale searches the listing of mangle/PREROUTING for the text
+// "ctmask 0xff0000" to decide whether its own rules are installed, and the
+// text of Inferscale's mask, 0xff000000, begins with Tailscale's: a rule of
+// ours in that chain made Tailscale skip its own.
 func TestAddAndDelConnmarkSaveRule(t *testing.T) {
-	preroutingArgs := []string{
-		"-m", "conntrack",
-		"--ctstate", "ESTABLISHED,RELATED",
-		"-m", "connmark",
-		"!", "--mark", "0x0/0xff000000",
-		"-j", "CONNMARK",
-		"--restore-mark",
-		"--nfmask", "0xff000000",
-		"--ctmask", "0xff000000",
+	type placed struct {
+		builtin, chain string
+		args           []string
 	}
-
-	outputArgs := []string{
-		"-m", "conntrack",
-		"--ctstate", "NEW",
-		"-m", "mark",
-		"!", "--mark", "0x0/0xff000000",
-		"-j", "CONNMARK",
-		"--save-mark",
-		"--nfmask", "0xff000000",
-		"--ctmask", "0xff000000",
+	rules := []placed{
+		{"PREROUTING", "is-prerouting", []string{
+			"-m", "conntrack",
+			"--ctstate", "ESTABLISHED,RELATED",
+			"-m", "connmark",
+			"!", "--mark", "0x0/0xff000000",
+			"-j", "CONNMARK",
+			"--restore-mark",
+			"--nfmask", "0xff000000",
+			"--ctmask", "0xff000000",
+		}},
+		{"OUTPUT", "is-output", []string{
+			"-m", "conntrack",
+			"--ctstate", "NEW",
+			"-m", "mark",
+			"!", "--mark", "0x0/0xff000000",
+			"-j", "CONNMARK",
+			"--save-mark",
+			"--nfmask", "0xff000000",
+			"--ctmask", "0xff000000",
+		}},
 	}
-
-	t.Run("with_ipv6", func(t *testing.T) {
-		iptr := newFakeIPTablesRunner()
-
-		// Add connmark rules
-		if err := iptr.AddConnmarkSaveRule(); err != nil {
-			t.Fatalf("AddConnmarkSaveRule failed: %v", err)
+	// tailscale is the same rule as Tailscale installs it, with its mask.
+	tailscale := func(args []string) []string {
+		out := make([]string, len(args))
+		for i, a := range args {
+			out[i] = strings.ReplaceAll(a, "0xff000000", "0xff0000")
 		}
-
-		// Verify rules exist in both IPv4 and IPv6
-		for _, proto := range []iptablesInterface{iptr.ipt4, iptr.ipt6} {
-			if exists, err := proto.Exists("mangle", "PREROUTING", preroutingArgs...); err != nil {
-				t.Fatalf("error checking PREROUTING rule: %v", err)
-			} else if !exists {
-				t.Errorf("PREROUTING connmark rule doesn't exist")
-			}
-
-			if exists, err := proto.Exists("mangle", "OUTPUT", outputArgs...); err != nil {
-				t.Fatalf("error checking OUTPUT rule: %v", err)
-			} else if !exists {
-				t.Errorf("OUTPUT connmark rule doesn't exist")
-			}
-		}
-
-		// Test idempotency - calling AddConnmarkSaveRule again should not fail or duplicate
-		if err := iptr.AddConnmarkSaveRule(); err != nil {
-			t.Fatalf("AddConnmarkSaveRule (second call) failed: %v", err)
-		}
-
-		// Verify rules still exist and weren't duplicated
-		for _, proto := range []iptablesInterface{iptr.ipt4, iptr.ipt6} {
-			preroutingRules, err := proto.List("mangle", "PREROUTING")
-			if err != nil {
-				t.Fatalf("error listing PREROUTING rules: %v", err)
-			}
-			connmarkCount := 0
-			for _, rule := range preroutingRules {
-				if strings.Contains(rule, "CONNMARK") && strings.Contains(rule, "restore-mark") {
-					connmarkCount++
-				}
-			}
-			if connmarkCount != 1 {
-				t.Errorf("expected 1 PREROUTING connmark rule, got %d", connmarkCount)
-			}
-		}
-
-		// Delete connmark rules
-		if err := iptr.DelConnmarkSaveRule(); err != nil {
-			t.Fatalf("DelConnmarkSaveRule failed: %v", err)
-		}
-
-		// Verify rules are deleted
-		for _, proto := range []iptablesInterface{iptr.ipt4, iptr.ipt6} {
-			if exists, err := proto.Exists("mangle", "PREROUTING", preroutingArgs...); err != nil {
-				t.Fatalf("error checking PREROUTING rule: %v", err)
-			} else if exists {
-				t.Errorf("PREROUTING connmark rule still exists after deletion")
-			}
-
-			if exists, err := proto.Exists("mangle", "OUTPUT", outputArgs...); err != nil {
-				t.Fatalf("error checking OUTPUT rule: %v", err)
-			} else if exists {
-				t.Errorf("OUTPUT connmark rule still exists after deletion")
-			}
-		}
-
-		// Test idempotency of deletion
-		if err := iptr.DelConnmarkSaveRule(); err != nil {
-			t.Fatalf("DelConnmarkSaveRule (second call) failed: %v", err)
-		}
-	})
-
-	t.Run("without_ipv6", func(t *testing.T) {
-		// Create an iptables runner with only IPv4 (simulating system without IPv6)
-		iptr := &iptablesRunner{
-			ipt4:              newFakeIPTables(),
-			ipt6:              nil, // IPv6 not available
-			v6Available:       false,
-			v6NATAvailable:    false,
-			v6FilterAvailable: false,
-		}
-
-		// Add connmark rules should NOT panic with nil ipt6
-		if err := iptr.AddConnmarkSaveRule(); err != nil {
-			t.Fatalf("AddConnmarkSaveRule failed with IPv6 disabled: %v", err)
-		}
-
-		// Verify rules exist ONLY in IPv4
-		if exists, err := iptr.ipt4.Exists("mangle", "PREROUTING", preroutingArgs...); err != nil {
-			t.Fatalf("error checking IPv4 PREROUTING rule: %v", err)
-		} else if !exists {
-			t.Errorf("IPv4 PREROUTING connmark rule doesn't exist")
-		}
-
-		if exists, err := iptr.ipt4.Exists("mangle", "OUTPUT", outputArgs...); err != nil {
-			t.Fatalf("error checking IPv4 OUTPUT rule: %v", err)
-		} else if !exists {
-			t.Errorf("IPv4 OUTPUT connmark rule doesn't exist")
-		}
-
-		// Delete connmark rules should NOT panic with nil ipt6
-		if err := iptr.DelConnmarkSaveRule(); err != nil {
-			t.Fatalf("DelConnmarkSaveRule failed with IPv6 disabled: %v", err)
-		}
-
-		// Verify rules are deleted from IPv4
-		if exists, err := iptr.ipt4.Exists("mangle", "PREROUTING", preroutingArgs...); err != nil {
-			t.Fatalf("error checking IPv4 PREROUTING rule: %v", err)
-		} else if exists {
-			t.Errorf("IPv4 PREROUTING connmark rule still exists after deletion")
-		}
-
-		if exists, err := iptr.ipt4.Exists("mangle", "OUTPUT", outputArgs...); err != nil {
-			t.Fatalf("error checking IPv4 OUTPUT rule: %v", err)
-		} else if exists {
-			t.Errorf("IPv4 OUTPUT connmark rule still exists after deletion")
-		}
-	})
-
-	// count is how many rules in table/chain are exactly args.
-	count := func(t *testing.T, ipt iptablesInterface, chain string, args []string) int {
-		t.Helper()
+		return out
+	}
+	// list is the rules of mangle/chain; ok is false if there is no such chain.
+	list := func(ipt iptablesInterface, chain string) (rules []string, ok bool) {
 		rules, err := ipt.List("mangle", chain)
-		if err != nil {
-			t.Fatal(err)
-		}
+		return rules, err == nil
+	}
+	count := func(ipt iptablesInterface, chain string, args []string) int {
+		rules, _ := list(ipt, chain)
 		n := 0
 		for _, rule := range rules {
 			if rule == strings.Join(args, " ") {
@@ -519,69 +440,191 @@ func TestAddAndDelConnmarkSaveRule(t *testing.T) {
 		}
 		return n
 	}
-
-	// Inferscale runs beside Tailscale, which installs the same two rules
-	// with its own mask, 0xff0000. Its rules are not ours: with them
-	// already there, ours are still added, once.
-	t.Run("beside_tailscale", func(t *testing.T) {
-		tailscale := func(args []string) []string {
-			out := make([]string, len(args))
-			for i, a := range args {
-				out[i] = strings.ReplaceAll(a, "0xff000000", "0xff0000")
+	wantInstalled := func(t *testing.T, name string, ipt iptablesInterface) {
+		t.Helper()
+		for _, r := range rules {
+			if got, _ := list(ipt, r.chain); len(got) != 1 || got[0] != strings.Join(r.args, " ") {
+				t.Errorf("%s: mangle/%s = %q, want only the connmark rule", name, r.chain, got)
 			}
-			return out
+			if n := count(ipt, r.builtin, []string{"-j", r.chain}); n != 1 {
+				t.Errorf("%s: %d jumps to %s in mangle/%s, want 1", name, n, r.chain, r.builtin)
+			}
+			if n := count(ipt, r.builtin, r.args); n != 0 {
+				t.Errorf("%s: the connmark rule is in the built-in mangle/%s", name, r.builtin)
+			}
 		}
-		iptr := newFakeIPTablesRunner()
-		for _, ipt := range []iptablesInterface{iptr.ipt4, iptr.ipt6} {
-			if err := ipt.Insert("mangle", "PREROUTING", 1, tailscale(preroutingArgs)...); err != nil {
-				t.Fatal(err)
+		if tailscaleSeesItsConnmarkRule(t, ipt) {
+			t.Errorf("%s: Tailscale takes a rule in mangle/PREROUTING for its own and will not add its connmark rules", name)
+		}
+	}
+	wantRemoved := func(t *testing.T, name string, ipt iptablesInterface) {
+		t.Helper()
+		for _, r := range rules {
+			if _, ok := list(ipt, r.chain); ok {
+				t.Errorf("%s: mangle/%s still exists", name, r.chain)
 			}
-			if err := ipt.Insert("mangle", "OUTPUT", 1, tailscale(outputArgs)...); err != nil {
-				t.Fatal(err)
+			if count(ipt, r.builtin, []string{"-j", r.chain}) != 0 || count(ipt, r.builtin, r.args) != 0 {
+				t.Errorf("%s: something of Inferscale's is left in mangle/%s", name, r.builtin)
+			}
+		}
+	}
+	both := func(iptr *iptablesRunner) map[string]iptablesInterface {
+		return map[string]iptablesInterface{"IPv4": iptr.ipt4, "IPv6": iptr.ipt6}
+	}
+
+	t.Run("with_ipv6", func(t *testing.T) {
+		iptr := newFakeIPTablesRunner()
+		for call := 1; call <= 2; call++ { // the second call changes nothing
+			if err := iptr.AddConnmarkSaveRule(); err != nil {
+				t.Fatalf("AddConnmarkSaveRule (call %d) failed: %v", call, err)
+			}
+			for name, ipt := range both(iptr) {
+				wantInstalled(t, name, ipt)
+				for _, r := range rules {
+					if got, _ := list(ipt, r.builtin); len(got) == 0 || got[0] != "-j "+r.chain {
+						t.Errorf("%s: the jump is not first in mangle/%s: %q", name, r.builtin, got)
+					}
+				}
+			}
+		}
+		for call := 1; call <= 2; call++ { // deleting twice is not an error
+			if err := iptr.DelConnmarkSaveRule(); err != nil {
+				t.Fatalf("DelConnmarkSaveRule (call %d) failed: %v", call, err)
+			}
+			for name, ipt := range both(iptr) {
+				wantRemoved(t, name, ipt)
+			}
+		}
+	})
+
+	t.Run("without_ipv6", func(t *testing.T) {
+		// A system without IPv6: ipt6 is nil and must not be touched.
+		iptr := &iptablesRunner{ipt4: newFakeIPTables()}
+		if err := iptr.AddConnmarkSaveRule(); err != nil {
+			t.Fatalf("AddConnmarkSaveRule failed with IPv6 disabled: %v", err)
+		}
+		wantInstalled(t, "IPv4", iptr.ipt4)
+		if err := iptr.DelConnmarkSaveRule(); err != nil {
+			t.Fatalf("DelConnmarkSaveRule failed with IPv6 disabled: %v", err)
+		}
+		wantRemoved(t, "IPv4", iptr.ipt4)
+	})
+
+	// Tailscale installed its rules first. They are not ours: ours are still
+	// added, once, and Tailscale's are left alone.
+	t.Run("after_tailscale", func(t *testing.T) {
+		iptr := newFakeIPTablesRunner()
+		for _, ipt := range both(iptr) {
+			for _, r := range rules {
+				if err := ipt.Insert("mangle", r.builtin, 1, tailscale(r.args)...); err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 		for call := 1; call <= 2; call++ {
 			if err := iptr.AddConnmarkSaveRule(); err != nil {
 				t.Fatalf("AddConnmarkSaveRule (call %d) failed: %v", call, err)
 			}
-			for name, ipt := range map[string]iptablesInterface{"IPv4": iptr.ipt4, "IPv6": iptr.ipt6} {
-				if n := count(t, ipt, "PREROUTING", preroutingArgs); n != 1 {
-					t.Errorf("call %d, %s: %d Inferscale PREROUTING rules beside Tailscale's, want 1", call, name, n)
-				}
-				if n := count(t, ipt, "OUTPUT", outputArgs); n != 1 {
-					t.Errorf("call %d, %s: %d Inferscale OUTPUT rules beside Tailscale's, want 1", call, name, n)
-				}
-				if count(t, ipt, "PREROUTING", tailscale(preroutingArgs)) != 1 || count(t, ipt, "OUTPUT", tailscale(outputArgs)) != 1 {
-					t.Errorf("call %d, %s: Tailscale's rules were changed", call, name)
+			for name, ipt := range both(iptr) {
+				for _, r := range rules {
+					if got, _ := list(ipt, r.chain); len(got) != 1 || got[0] != strings.Join(r.args, " ") {
+						t.Errorf("call %d, %s: mangle/%s = %q, want only the connmark rule", call, name, r.chain, got)
+					}
+					if n := count(ipt, r.builtin, []string{"-j", r.chain}); n != 1 {
+						t.Errorf("call %d, %s: %d jumps to %s, want 1", call, name, n, r.chain)
+					}
+					if n := count(ipt, r.builtin, tailscale(r.args)); n != 1 {
+						t.Errorf("call %d, %s: %d of Tailscale's rules in mangle/%s, want 1 untouched", call, name, n, r.builtin)
+					}
 				}
 			}
 		}
 	})
 
-	// Each of the two rules is added when it is missing and left alone when
-	// it is there, whatever the state of the other: one of them can be lost
-	// (an Insert that failed half way, an administrator's flush).
-	t.Run("restores_a_missing_rule", func(t *testing.T) {
-		for _, missing := range []struct {
-			chain string
-			args  []string
-		}{{"OUTPUT", outputArgs}, {"PREROUTING", preroutingArgs}} {
+	// Tailscale starts after Inferscale. Its own check must not take anything
+	// of ours for its rule, so it adds its two rules, and ours stay.
+	t.Run("before_tailscale", func(t *testing.T) {
+		iptr := newFakeIPTablesRunner()
+		if err := iptr.AddConnmarkSaveRule(); err != nil {
+			t.Fatal(err)
+		}
+		for name, ipt := range both(iptr) {
+			if tailscaleSeesItsConnmarkRule(t, ipt) {
+				t.Fatalf("%s: Tailscale takes a rule in mangle/PREROUTING for its own and will not add its connmark rules", name)
+			}
+			// What tailscaled does next, having found none of its rules.
+			for _, r := range rules {
+				if err := ipt.Insert("mangle", r.builtin, 1, tailscale(r.args)...); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, r := range rules {
+				if got, _ := list(ipt, r.chain); len(got) != 1 || got[0] != strings.Join(r.args, " ") {
+					t.Errorf("%s: mangle/%s = %q after Tailscale started, want only the connmark rule", name, r.chain, got)
+				}
+				if count(ipt, r.builtin, []string{"-j", r.chain}) != 1 {
+					t.Errorf("%s: the jump to %s is gone after Tailscale started", name, r.chain)
+				}
+			}
+		}
+	})
+
+	// Whatever is missing is put back, and what is there is not doubled: a
+	// jump or a rule can be lost (a call that failed half way, a flush by an
+	// administrator), in one table and not the other.
+	t.Run("restores_what_is_missing", func(t *testing.T) {
+		for _, r := range rules {
+			for _, lose := range []struct {
+				what string
+				do   func(ipt iptablesInterface) error
+			}{
+				{"the jump from " + r.builtin, func(ipt iptablesInterface) error { return ipt.Delete("mangle", r.builtin, "-j", r.chain) }},
+				{"the rule in " + r.chain, func(ipt iptablesInterface) error { return ipt.ClearChain("mangle", r.chain) }},
+			} {
+				iptr := newFakeIPTablesRunner()
+				if err := iptr.AddConnmarkSaveRule(); err != nil {
+					t.Fatal(err)
+				}
+				if err := lose.do(iptr.ipt4); err != nil {
+					t.Fatalf("losing %s: %v", lose.what, err)
+				}
+				if err := iptr.AddConnmarkSaveRule(); err != nil {
+					t.Fatalf("AddConnmarkSaveRule after losing %s: %v", lose.what, err)
+				}
+				for name, ipt := range both(iptr) {
+					wantInstalled(t, name+" after losing "+lose.what, ipt)
+				}
+			}
+		}
+	})
+
+	// A build from before the rules had chains of their own left them in the
+	// built-in chains. Adding moves them; deleting removes them too.
+	t.Run("replaces_rules_from_an_older_build", func(t *testing.T) {
+		older := func() *iptablesRunner {
 			iptr := newFakeIPTablesRunner()
-			if err := iptr.AddConnmarkSaveRule(); err != nil {
-				t.Fatal(err)
+			for _, ipt := range both(iptr) {
+				for _, r := range rules {
+					if err := ipt.Insert("mangle", r.builtin, 1, r.args...); err != nil {
+						t.Fatal(err)
+					}
+				}
 			}
-			if err := iptr.ipt4.Delete("mangle", missing.chain, missing.args...); err != nil {
-				t.Fatal(err)
-			}
-			if err := iptr.AddConnmarkSaveRule(); err != nil {
-				t.Fatalf("AddConnmarkSaveRule with the %s rule missing: %v", missing.chain, err)
-			}
-			if n := count(t, iptr.ipt4, "PREROUTING", preroutingArgs); n != 1 {
-				t.Errorf("%s rule was missing: %d PREROUTING rules after the second call, want 1", missing.chain, n)
-			}
-			if n := count(t, iptr.ipt4, "OUTPUT", outputArgs); n != 1 {
-				t.Errorf("%s rule was missing: %d OUTPUT rules after the second call, want 1", missing.chain, n)
-			}
+			return iptr
+		}
+		iptr := older()
+		if err := iptr.AddConnmarkSaveRule(); err != nil {
+			t.Fatal(err)
+		}
+		for name, ipt := range both(iptr) {
+			wantInstalled(t, name, ipt)
+		}
+		iptr = older()
+		if err := iptr.DelConnmarkSaveRule(); err != nil {
+			t.Fatal(err)
+		}
+		for name, ipt := range both(iptr) {
+			wantRemoved(t, name, ipt)
 		}
 	})
 }

@@ -40,14 +40,14 @@ type Config = router.Config
 
 func TestRouterStates(t *testing.T) {
 	basic := `
-ip rule add -4 pref 5210 fwmark 0x80000/0xff0000 table main
-ip rule add -4 pref 5230 fwmark 0x80000/0xff0000 table default
-ip rule add -4 pref 5250 fwmark 0x80000/0xff0000 type unreachable
-ip rule add -4 pref 5270 table 52
-ip rule add -6 pref 5210 fwmark 0x80000/0xff0000 table main
-ip rule add -6 pref 5230 fwmark 0x80000/0xff0000 table default
-ip rule add -6 pref 5250 fwmark 0x80000/0xff0000 type unreachable
-ip rule add -6 pref 5270 table 52
+ip rule add -4 pref 5310 fwmark 0x8000000/0xff000000 table main
+ip rule add -4 pref 5330 fwmark 0x8000000/0xff000000 table default
+ip rule add -4 pref 5350 fwmark 0x8000000/0xff000000 type unreachable
+ip rule add -4 pref 5370 table 87
+ip rule add -6 pref 5310 fwmark 0x8000000/0xff000000 table main
+ip rule add -6 pref 5330 fwmark 0x8000000/0xff000000 table default
+ip rule add -6 pref 5350 fwmark 0x8000000/0xff000000 type unreachable
+ip rule add -6 pref 5370 table 87
 `
 	states := []struct {
 		name string
@@ -81,8 +81,8 @@ ip addr add 100.101.102.103/10 dev tailscale0` + basic,
 			want: `
 up
 ip addr add 100.101.102.103/10 dev tailscale0
-ip route add 100.100.100.100/32 dev tailscale0 table 52
-ip route add 192.168.16.0/24 dev tailscale0 table 52` + basic,
+ip route add 100.100.100.100/32 dev tailscale0 table 87
+ip route add 192.168.16.0/24 dev tailscale0 table 87` + basic,
 		},
 
 		{
@@ -96,8 +96,8 @@ ip route add 192.168.16.0/24 dev tailscale0 table 52` + basic,
 			want: `
 up
 ip addr add 100.101.102.103/10 dev tailscale0
-ip route add 100.100.100.100/32 dev tailscale0 table 52
-ip route add 192.168.16.0/24 dev tailscale0 table 52` + basic,
+ip route add 100.100.100.100/32 dev tailscale0 table 87
+ip route add 192.168.16.0/24 dev tailscale0 table 87` + basic,
 		},
 
 		{
@@ -113,32 +113,32 @@ ip route add 192.168.16.0/24 dev tailscale0 table 52` + basic,
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 10.0.0.0/8 dev tailscale0 table 52
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -m conntrack ! --ctstate ESTABLISHED,RELATED -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v4/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -m conntrack ! --ctstate ESTABLISHED,RELATED -j DROP
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
-v6/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
+ip route add 10.0.0.0/8 dev tailscale0 table 87
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -m conntrack ! --ctstate ESTABLISHED,RELATED -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v4/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -m conntrack ! --ctstate ESTABLISHED,RELATED -j DROP
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
+v6/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
 `,
 		},
 		{
@@ -154,30 +154,30 @@ v6/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 10.0.0.0/8 dev tailscale0 table 52
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v4/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
-v6/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
+ip route add 10.0.0.0/8 dev tailscale0 table 87
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v4/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
+v6/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
 `,
 		},
 		{
@@ -190,28 +190,28 @@ v6/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 10.0.0.0/8 dev tailscale0 table 52
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
+ip route add 10.0.0.0/8 dev tailscale0 table 87
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
 `,
 		},
 
@@ -227,28 +227,28 @@ v6/nat/POSTROUTING -j ts-postrouting
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 10.0.0.0/8 dev tailscale0 table 52
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
+ip route add 10.0.0.0/8 dev tailscale0 table 87
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
 `,
 		},
 		{
@@ -261,28 +261,28 @@ v6/nat/POSTROUTING -j ts-postrouting
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 10.0.0.0/8 dev tailscale0 table 52
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
+ip route add 10.0.0.0/8 dev tailscale0 table 87
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
 `,
 		},
 
@@ -296,18 +296,18 @@ v6/nat/POSTROUTING -j ts-postrouting
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 10.0.0.0/8 dev tailscale0 table 52
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
+ip route add 10.0.0.0/8 dev tailscale0 table 87
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -j ACCEPT
 `,
 		},
 		{
@@ -320,28 +320,28 @@ v6/filter/ts-forward -o tailscale0 -j ACCEPT
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 10.0.0.0/8 dev tailscale0 table 52
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
+ip route add 10.0.0.0/8 dev tailscale0 table 87
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
 `,
 		},
 		{
@@ -355,29 +355,29 @@ v6/nat/POSTROUTING -j ts-postrouting
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 0.0.0.0/0 dev tailscale0 table 52
-ip route add 100.100.100.100/32 dev tailscale0 table 52
-ip route add throw 10.0.0.0/8 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
+ip route add 0.0.0.0/0 dev tailscale0 table 87
+ip route add 100.100.100.100/32 dev tailscale0 table 87
+ip route add throw 10.0.0.0/8 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
 `,
 		},
 		{
@@ -391,10 +391,10 @@ v6/nat/POSTROUTING -j ts-postrouting
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 0.0.0.0/0 dev tailscale0 table 52
-ip route add 100.100.100.100/32 dev tailscale0 table 52
-ip route add throw 10.0.0.0/8 table 52
-ip route add throw 192.168.0.0/24 table 52` + basic,
+ip route add 0.0.0.0/0 dev tailscale0 table 87
+ip route add 100.100.100.100/32 dev tailscale0 table 87
+ip route add throw 10.0.0.0/8 table 87
+ip route add throw 192.168.0.0/24 table 87` + basic,
 		},
 		{
 			name: "subnet-routes-connmark-for-rp_filter",
@@ -408,29 +408,29 @@ ip route add throw 192.168.0.0/24 table 52` + basic,
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v4/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
-v6/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v4/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
+v6/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
 `,
 		},
 		{
@@ -445,29 +445,29 @@ v6/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v4/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
-v6/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v4/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
+v6/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
 `,
 		},
 		{
@@ -483,31 +483,31 @@ v6/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
 			want: `
 up
 ip addr add 100.101.102.104/10 dev tailscale0
-ip route add 100.100.100.100/32 dev tailscale0 table 52` + basic +
-				`v4/filter/FORWARD -j ts-forward
-v4/filter/INPUT -j ts-input
-v4/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v4/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v4/filter/ts-forward -o tailscale0 -s 100.64.0.0/10 -j DROP
-v4/filter/ts-forward -o tailscale0 -m conntrack ! --ctstate ESTABLISHED,RELATED -j DROP
-v4/filter/ts-forward -o tailscale0 -j ACCEPT
-v4/filter/ts-input -i lo -s 100.101.102.104 -j ACCEPT
-v4/filter/ts-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
-v4/filter/ts-input ! -i tailscale0 -s 100.64.0.0/10 -j DROP
-v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v4/nat/POSTROUTING -j ts-postrouting
-v4/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
-v6/filter/FORWARD -j ts-forward
-v6/filter/INPUT -j ts-input
-v6/filter/ts-forward -i tailscale0 -j MARK --set-mark 0x40000/0xff0000
-v6/filter/ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
-v6/filter/ts-forward -o tailscale0 -m conntrack ! --ctstate ESTABLISHED,RELATED -j DROP
-v6/filter/ts-forward -o tailscale0 -j ACCEPT
-v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000
-v6/nat/POSTROUTING -j ts-postrouting
-v6/nat/ts-postrouting -m mark --mark 0x40000/0xff0000 -j MASQUERADE
+ip route add 100.100.100.100/32 dev tailscale0 table 87` + basic +
+				`v4/filter/FORWARD -j is-forward
+v4/filter/INPUT -j is-input
+v4/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v4/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v4/filter/is-forward -o tailscale0 -s 198.18.0.0/15 -j DROP
+v4/filter/is-forward -o tailscale0 -m conntrack ! --ctstate ESTABLISHED,RELATED -j DROP
+v4/filter/is-forward -o tailscale0 -j ACCEPT
+v4/filter/is-input -i lo -s 100.101.102.104 -j ACCEPT
+v4/filter/is-input ! -i tailscale0 -s 100.115.92.0/23 -j RETURN
+v4/filter/is-input ! -i tailscale0 -s 198.18.0.0/15 -j DROP
+v4/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v4/nat/POSTROUTING -j is-postrouting
+v4/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
+v6/filter/FORWARD -j is-forward
+v6/filter/INPUT -j is-input
+v6/filter/is-forward -i tailscale0 -j MARK --set-mark 0x04000000/0xff000000
+v6/filter/is-forward -m mark --mark 0x04000000/0xff000000 -j ACCEPT
+v6/filter/is-forward -o tailscale0 -m conntrack ! --ctstate ESTABLISHED,RELATED -j DROP
+v6/filter/is-forward -o tailscale0 -j ACCEPT
+v6/mangle/OUTPUT -m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff000000 -j CONNMARK --save-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/mangle/PREROUTING -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff000000 --ctmask 0xff000000
+v6/nat/POSTROUTING -j is-postrouting
+v6/nat/is-postrouting -m mark --mark 0x04000000/0xff000000 -j MASQUERADE
 `,
 		},
 	}
@@ -602,14 +602,14 @@ func newIPTablesRunner(t *testing.T) linuxfw.NetfilterRunner {
 }
 
 func insertRule(n *fakeIPTablesRunner, curIPT map[string][]string, chain, newRule string) error {
-	// Get current rules for filter/ts-input chain with according IP version
+	// Get current rules for filter/is-input chain with according IP version
 	curTSInputRules, ok := curIPT[chain]
 	if !ok {
 		n.t.Fatalf("no %s chain exists", chain)
 		return fmt.Errorf("no %s chain exists", chain)
 	}
 
-	// Add new rule to top of filter/ts-input
+	// Add new rule to top of filter/is-input
 	curTSInputRules = append(curTSInputRules, "")
 	copy(curTSInputRules[1:], curTSInputRules)
 	curTSInputRules[0] = newRule
@@ -634,28 +634,28 @@ func insertRuleAt(n *fakeIPTablesRunner, curIPT map[string][]string, chain strin
 }
 
 func appendRule(n *fakeIPTablesRunner, curIPT map[string][]string, chain, newRule string) error {
-	// Get current rules for filter/ts-input chain with according IP version
+	// Get current rules for filter/is-input chain with according IP version
 	curTSInputRules, ok := curIPT[chain]
 	if !ok {
 		n.t.Fatalf("no %s chain exists", chain)
 		return fmt.Errorf("no %s chain exists", chain)
 	}
 
-	// Add new rule to end of filter/ts-input
+	// Add new rule to end of filter/is-input
 	curTSInputRules = append(curTSInputRules, newRule)
 	curIPT[chain] = curTSInputRules
 	return nil
 }
 
 func deleteRule(n *fakeIPTablesRunner, curIPT map[string][]string, chain, delRule string) error {
-	// Get current rules for filter/ts-input chain with according IP version
+	// Get current rules for filter/is-input chain with according IP version
 	curTSInputRules, ok := curIPT[chain]
 	if !ok {
 		n.t.Fatalf("no %s chain exists", chain)
 		return fmt.Errorf("no %s chain exists", chain)
 	}
 
-	// Remove rule from filter/ts-input
+	// Remove rule from filter/is-input
 	for i, rule := range curTSInputRules {
 		if rule == delRule {
 			curTSInputRules = append(curTSInputRules[:i], curTSInputRules[i+1:]...)
@@ -673,7 +673,7 @@ func (n *fakeIPTablesRunner) AddLoopbackRule(addr netip.Addr) error {
 	}
 	newRule := fmt.Sprintf("-i lo -s %s -j ACCEPT", addr.String())
 
-	return insertRule(n, curIPT, "filter/ts-input", newRule)
+	return insertRule(n, curIPT, "filter/is-input", newRule)
 }
 
 func (n *fakeIPTablesRunner) AddBase(tunname string) error {
@@ -733,10 +733,10 @@ type iptRule struct{ chain, rule string }
 func (n *fakeIPTablesRunner) addBase4(tunname string) error {
 	curIPT := n.ipt4
 	newRules := []iptRule{
-		{"filter/ts-forward", fmt.Sprintf("-i %s -j MARK --set-mark %s/%s", tunname, tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)},
-		{"filter/ts-forward", fmt.Sprintf("-m mark --mark %s/%s -j ACCEPT", tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)},
-		{"filter/ts-forward", fmt.Sprintf("-o %s -s %s -j DROP", tunname, tsaddr.CGNATRange().String())},
-		{"filter/ts-forward", fmt.Sprintf("-o %s -j ACCEPT", tunname)},
+		{"filter/is-forward", fmt.Sprintf("-i %s -j MARK --set-mark %s/%s", tunname, tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)},
+		{"filter/is-forward", fmt.Sprintf("-m mark --mark %s/%s -j ACCEPT", tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)},
+		{"filter/is-forward", fmt.Sprintf("-o %s -s %s -j DROP", tunname, tsaddr.CGNATRange().String())},
+		{"filter/is-forward", fmt.Sprintf("-o %s -j ACCEPT", tunname)},
 	}
 	for _, rule := range newRules {
 		if err := appendRule(n, curIPT, rule.chain, rule.rule); err != nil {
@@ -749,9 +749,9 @@ func (n *fakeIPTablesRunner) addBase4(tunname string) error {
 func (n *fakeIPTablesRunner) addBase6(tunname string) error {
 	curIPT := n.ipt6
 	newRules := []iptRule{
-		{"filter/ts-forward", fmt.Sprintf("-i %s -j MARK --set-mark %s/%s", tunname, tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)},
-		{"filter/ts-forward", fmt.Sprintf("-m mark --mark %s/%s -j ACCEPT", tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)},
-		{"filter/ts-forward", fmt.Sprintf("-o %s -j ACCEPT", tunname)},
+		{"filter/is-forward", fmt.Sprintf("-i %s -j MARK --set-mark %s/%s", tunname, tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)},
+		{"filter/is-forward", fmt.Sprintf("-m mark --mark %s/%s -j ACCEPT", tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)},
+		{"filter/is-forward", fmt.Sprintf("-o %s -j ACCEPT", tunname)},
 	}
 	for _, rule := range newRules {
 		if err := appendRule(n, curIPT, rule.chain, rule.rule); err != nil {
@@ -769,14 +769,14 @@ func (n *fakeIPTablesRunner) DelLoopbackRule(addr netip.Addr) error {
 
 	delRule := fmt.Sprintf("-i lo -s %s -j ACCEPT", addr.String())
 
-	return deleteRule(n, curIPT, "filter/ts-input", delRule)
+	return deleteRule(n, curIPT, "filter/is-input", delRule)
 }
 
 func (n *fakeIPTablesRunner) AddHooks() error {
 	newRules := []iptRule{
-		{"filter/INPUT", "-j ts-input"},
-		{"filter/FORWARD", "-j ts-forward"},
-		{"nat/POSTROUTING", "-j ts-postrouting"},
+		{"filter/INPUT", "-j is-input"},
+		{"filter/FORWARD", "-j is-forward"},
+		{"nat/POSTROUTING", "-j is-postrouting"},
 	}
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
 		for _, r := range newRules {
@@ -790,9 +790,9 @@ func (n *fakeIPTablesRunner) AddHooks() error {
 
 func (n *fakeIPTablesRunner) DelHooks(logf logger.Logf) error {
 	delRules := []iptRule{
-		{"filter/INPUT", "-j ts-input"},
-		{"filter/FORWARD", "-j ts-forward"},
-		{"nat/POSTROUTING", "-j ts-postrouting"},
+		{"filter/INPUT", "-j is-input"},
+		{"filter/FORWARD", "-j is-forward"},
+		{"nat/POSTROUTING", "-j is-postrouting"},
 	}
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
 		for _, r := range delRules {
@@ -809,7 +809,7 @@ func (n *fakeIPTablesRunner) AddChains() error {
 		return n.addChainsErr
 	}
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
-		for _, chain := range []string{"filter/ts-input", "filter/ts-forward", "nat/ts-postrouting"} {
+		for _, chain := range []string{"filter/is-input", "filter/is-forward", "nat/is-postrouting"} {
 			ipt[chain] = nil
 		}
 	}
@@ -819,7 +819,7 @@ func (n *fakeIPTablesRunner) AddChains() error {
 func (n *fakeIPTablesRunner) DelChains() error {
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
 		for chain := range ipt {
-			if strings.HasPrefix(chain, "filter/ts-") || strings.HasPrefix(chain, "nat/ts-") {
+			if strings.HasPrefix(chain, "filter/is-") || strings.HasPrefix(chain, "nat/is-") {
 				delete(ipt, chain)
 			}
 		}
@@ -829,7 +829,7 @@ func (n *fakeIPTablesRunner) DelChains() error {
 
 func (n *fakeIPTablesRunner) DelBase() error {
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
-		for _, chain := range []string{"filter/ts-input", "filter/ts-forward", "nat/ts-postrouting"} {
+		for _, chain := range []string{"filter/is-input", "filter/is-forward", "nat/is-postrouting"} {
 			ipt[chain] = nil
 		}
 	}
@@ -839,7 +839,7 @@ func (n *fakeIPTablesRunner) DelBase() error {
 func (n *fakeIPTablesRunner) AddSNATRule() error {
 	newRule := fmt.Sprintf("-m mark --mark %s/%s -j MASQUERADE", tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
-		if err := appendRule(n, ipt, "nat/ts-postrouting", newRule); err != nil {
+		if err := appendRule(n, ipt, "nat/is-postrouting", newRule); err != nil {
 			return err
 		}
 	}
@@ -849,7 +849,7 @@ func (n *fakeIPTablesRunner) AddSNATRule() error {
 func (n *fakeIPTablesRunner) DelSNATRule() error {
 	delRule := fmt.Sprintf("-m mark --mark %s/%s -j MASQUERADE", tsconst.LinuxSubnetRouteMark, tsconst.LinuxFwmarkMask)
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
-		if err := deleteRule(n, ipt, "nat/ts-postrouting", delRule); err != nil {
+		if err := deleteRule(n, ipt, "nat/is-postrouting", delRule); err != nil {
 			return err
 		}
 	}
@@ -862,7 +862,7 @@ func (n *fakeIPTablesRunner) AddStatefulRule(tunname string) error {
 		// Mimic the real runner and insert after the 'accept all' rule
 		wantRule := fmt.Sprintf("-o %s -j ACCEPT", tunname)
 
-		const chain = "filter/ts-forward"
+		const chain = "filter/is-forward"
 		pos := slices.Index(ipt[chain], wantRule)
 		if pos < 0 {
 			n.t.Fatalf("no rule %q in chain %s", wantRule, chain)
@@ -876,7 +876,7 @@ func (n *fakeIPTablesRunner) AddStatefulRule(tunname string) error {
 func (n *fakeIPTablesRunner) DelStatefulRule(tunname string) error {
 	delRule := fmt.Sprintf("-o %s -m conntrack ! --ctstate ESTABLISHED,RELATED -j DROP", tunname)
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
-		if err := deleteRule(n, ipt, "filter/ts-forward", delRule); err != nil {
+		if err := deleteRule(n, ipt, "filter/is-forward", delRule); err != nil {
 			return err
 		}
 	}
@@ -905,7 +905,7 @@ func (n *fakeIPTablesRunner) AddMagicsockPortRule(port uint16, network string) e
 
 	rule := buildMagicsockPortRule(port)
 
-	if err := appendRule(n, ipt, "filter/ts-input", rule); err != nil {
+	if err := appendRule(n, ipt, "filter/is-input", rule); err != nil {
 		return err
 	}
 
@@ -928,17 +928,28 @@ func (n *fakeIPTablesRunner) DelMagicsockPortRule(port uint16, network string) e
 
 	rule := buildMagicsockPortRule(port)
 
-	if err := deleteRule(n, ipt, "filter/ts-input", rule); err != nil {
+	if err := deleteRule(n, ipt, "filter/is-input", rule); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// connmarkTestRules are the two connmark rules as this stand-in records them.
+// It records that the router asked for them, in the built-in chains. Where
+// the real runner puts them (chains of Inferscale's own, so that Tailscale
+// does not take them for its rules) is tested in util/linuxfw.
+func connmarkTestRules() (prerouteRule, outputRule string) {
+	mask := tsconst.LinuxFwmarkMask
+	prerouteRule = fmt.Sprintf("-m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask %s --ctmask %s", mask, mask)
+	outputRule = fmt.Sprintf("-m conntrack --ctstate NEW -m mark ! --mark 0x0/%s -j CONNMARK --save-mark --nfmask %s --ctmask %s", mask, mask, mask)
+	return prerouteRule, outputRule
+}
+
 func (n *fakeIPTablesRunner) AddConnmarkSaveRule() error {
 	n.addConnmarkSaveCalls++
 	// PREROUTING rule: restore mark from conntrack
-	prerouteRule := "-m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000"
+	prerouteRule, outputRule := connmarkTestRules()
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
 		if err := insertRule(n, ipt, "mangle/PREROUTING", prerouteRule); err != nil {
 			return err
@@ -946,7 +957,6 @@ func (n *fakeIPTablesRunner) AddConnmarkSaveRule() error {
 	}
 
 	// OUTPUT rule: save mark to conntrack for NEW connections
-	outputRule := "-m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000"
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
 		if err := insertRule(n, ipt, "mangle/OUTPUT", outputRule); err != nil {
 			return err
@@ -956,12 +966,11 @@ func (n *fakeIPTablesRunner) AddConnmarkSaveRule() error {
 }
 
 func (n *fakeIPTablesRunner) DelConnmarkSaveRule() error {
-	prerouteRule := "-m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark --nfmask 0xff0000 --ctmask 0xff0000"
+	prerouteRule, outputRule := connmarkTestRules()
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
 		deleteRule(n, ipt, "mangle/PREROUTING", prerouteRule) // ignore errors
 	}
 
-	outputRule := "-m conntrack --ctstate NEW -m mark ! --mark 0x0/0xff0000 -j CONNMARK --save-mark --nfmask 0xff0000 --ctmask 0xff0000"
 	for _, ipt := range []map[string][]string{n.ipt4, n.ipt6} {
 		deleteRule(n, ipt, "mangle/OUTPUT", outputRule) // ignore errors
 	}
@@ -972,12 +981,12 @@ func buildExternalCGNATRules(mode linuxfw.CGNATMode, tunname string) ([]iptRule,
 	switch mode {
 	case linuxfw.CGNATModeDrop:
 		return []iptRule{
-			{"filter/ts-input", fmt.Sprintf("! -i %s -s %s -j RETURN", tunname, tsaddr.ChromeOSVMRange().String())},
-			{"filter/ts-input", fmt.Sprintf("! -i %s -s %s -j DROP", tunname, tsaddr.CGNATRange().String())},
+			{"filter/is-input", fmt.Sprintf("! -i %s -s %s -j RETURN", tunname, tsaddr.ChromeOSVMRange().String())},
+			{"filter/is-input", fmt.Sprintf("! -i %s -s %s -j DROP", tunname, tsaddr.CGNATRange().String())},
 		}, nil
 	case linuxfw.CGNATModeReturn:
 		return []iptRule{
-			{"filter/ts-input", fmt.Sprintf("! -i %s -s %s -j RETURN", tunname, tsaddr.CGNATRange().String())},
+			{"filter/is-input", fmt.Sprintf("! -i %s -s %s -j RETURN", tunname, tsaddr.CGNATRange().String())},
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported mode %q", mode)
@@ -1283,9 +1292,11 @@ func TestRuleDeletedEvent(t *testing.T) {
 	lt, bus := newLinuxRootTest(t)
 	lt.r.nfr = fake.nfr
 	defer lt.Close()
+	// One of Inferscale's own rules: its table, and the first of its
+	// priorities.
 	event := netmon.RuleDeleted{
-		Table:    52,
-		Priority: 5210,
+		Table:    uint8(tailscaleRouteTable.Num),
+		Priority: uint32(lt.r.ipPolicyPrefBase + 10),
 	}
 	tw := eventbustest.NewWatcher(t, bus)
 
@@ -1293,9 +1304,19 @@ func TestRuleDeletedEvent(t *testing.T) {
 	if lt.r.ruleRestorePending.Load() {
 		t.Errorf("rule deletion already ongoing")
 	}
+
+	// A rule of Tailscale's (table 52, priority 5210) is not ours to restore:
+	// the two daemons run on one machine, each with its own priority range.
+	lt.r.onIPRuleDeleted(52, 5210)
+	if lt.r.ruleRestorePending.Load() {
+		t.Fatal("a deleted rule in Tailscale's priority range started a restore of Inferscale's rules")
+	}
+
 	injector := eventbustest.NewInjector(t, bus)
 	eventbustest.Inject(injector, event)
-	eventbustest.Expect(tw, eventbustest.Type[AddIPRules]())
+	if err := eventbustest.Expect(tw, eventbustest.Type[AddIPRules]()); err != nil {
+		t.Fatalf("deleting one of our rules did not restore them: %v", err)
+	}
 }
 
 func TestDelRouteIdempotent(t *testing.T) {
@@ -1565,7 +1586,7 @@ func TestUpdateMagicsockPortChange(t *testing.T) {
 		ipt4: make(map[string][]string),
 		ipt6: make(map[string][]string),
 	}
-	nfr.ipt4["filter/ts-input"] = []string{}
+	nfr.ipt4["filter/is-input"] = []string{}
 
 	r := &linuxRouter{
 		logf:          logger.Discard,
@@ -1583,19 +1604,19 @@ func TestUpdateMagicsockPortChange(t *testing.T) {
 	}
 
 	newPortRule := buildMagicsockPortRule(54321)
-	hasNewRule := slices.Contains(nfr.ipt4["filter/ts-input"], newPortRule)
+	hasNewRule := slices.Contains(nfr.ipt4["filter/is-input"], newPortRule)
 
 	if !hasNewRule {
 		t.Errorf("firewall rule for NEW port 54321 not found.\nExpected: %s\nActual rules: %v",
-			newPortRule, nfr.ipt4["filter/ts-input"])
+			newPortRule, nfr.ipt4["filter/is-input"])
 	}
 
 	oldPortRule := buildMagicsockPortRule(12345)
-	hasOldRule := slices.Contains(nfr.ipt4["filter/ts-input"], oldPortRule)
+	hasOldRule := slices.Contains(nfr.ipt4["filter/is-input"], oldPortRule)
 
 	if hasOldRule {
 		t.Errorf("firewall rule for OLD port 12345 still exists (should be deleted).\nFound: %s\nAll rules: %v",
-			oldPortRule, nfr.ipt4["filter/ts-input"])
+			oldPortRule, nfr.ipt4["filter/is-input"])
 	}
 }
 
@@ -1693,26 +1714,26 @@ func TestSetRemovesOrphanedTailscaleAddrs(t *testing.T) {
 	// profile's CGNAT v4 and Tailscale ULA v6 addresses, plus a non-Tailscale
 	// address that must be left alone.
 	fake.ips = []string{
-		"100.64.0.99/32 dev tailscale0",         // CGNAT v4 orphan
-		"fd7a:115c:a1e0::99/128 dev tailscale0", // ULA v6 orphan
+		"198.18.0.99/32 dev tailscale0",         // Inferscale v4 orphan
+		"fd2e:7c4a:9b10::99/128 dev tailscale0", // Inferscale ULA v6 orphan
 		"192.168.1.5/24 dev tailscale0",         // non-Tailscale, leave alone
 	}
 	slices.Sort(fake.ips)
 
 	cfg := &Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32"),
 		NetfilterMode: netfilterOff,
 	}
 	if err := lr.Set(cfg); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
 
-	if !slices.Contains(fake.ips, "100.64.0.1/32 dev tailscale0") {
-		t.Errorf("desired addr 100.64.0.1/32 not present; ips=%q", fake.ips)
+	if !slices.Contains(fake.ips, "198.18.0.1/32 dev tailscale0") {
+		t.Errorf("desired addr 198.18.0.1/32 not present; ips=%q", fake.ips)
 	}
 	for _, gone := range []string{
-		"100.64.0.99/32 dev tailscale0",
-		"fd7a:115c:a1e0::99/128 dev tailscale0",
+		"198.18.0.99/32 dev tailscale0",
+		"fd2e:7c4a:9b10::99/128 dev tailscale0",
 	} {
 		if slices.Contains(fake.ips, gone) {
 			t.Errorf("orphaned Tailscale addr %q was not removed; ips=%q", gone, fake.ips)
@@ -1733,22 +1754,22 @@ func TestSetRemovesOrphanWithNetfilter(t *testing.T) {
 	lr, fake := newTestLinuxRouter(t)
 
 	fake.ips = []string{
-		"100.64.0.99/32 dev tailscale0", // CGNAT v4 orphan, no loopback rule
+		"198.18.0.99/32 dev tailscale0", // Inferscale v4 orphan, no loopback rule
 	}
 
 	cfg := &Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32"),
 		NetfilterMode: netfilterOn,
 	}
 	if err := lr.Set(cfg); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
 
-	if slices.Contains(fake.ips, "100.64.0.99/32 dev tailscale0") {
+	if slices.Contains(fake.ips, "198.18.0.99/32 dev tailscale0") {
 		t.Errorf("orphan was not removed with netfilter on; ips=%q", fake.ips)
 	}
-	if !slices.Contains(fake.ips, "100.64.0.1/32 dev tailscale0") {
-		t.Errorf("desired addr 100.64.0.1/32 not present; ips=%q", fake.ips)
+	if !slices.Contains(fake.ips, "198.18.0.1/32 dev tailscale0") {
+		t.Errorf("desired addr 198.18.0.1/32 not present; ips=%q", fake.ips)
 	}
 }
 
@@ -1763,11 +1784,11 @@ func TestSetInstallsLoopbackRuleForExistingAddr(t *testing.T) {
 
 	// The node's own address persisted on the interface across the restart.
 	fake.ips = []string{
-		"100.64.0.1/32 dev tailscale0",
+		"198.18.0.1/32 dev tailscale0",
 	}
 
 	cfg := &Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32"),
 		NetfilterMode: netfilterOn,
 	}
 	if err := lr.Set(cfg); err != nil {
@@ -1775,10 +1796,10 @@ func TestSetInstallsLoopbackRuleForExistingAddr(t *testing.T) {
 	}
 
 	nfr := fake.nfr.(*fakeIPTablesRunner)
-	wantRule := "-i lo -s 100.64.0.1 -j ACCEPT"
-	if !slices.Contains(nfr.ipt4["filter/ts-input"], wantRule) {
-		t.Errorf("loopback rule %q not installed for already-present addr; ts-input=%q",
-			wantRule, nfr.ipt4["filter/ts-input"])
+	wantRule := "-i lo -s 198.18.0.1 -j ACCEPT"
+	if !slices.Contains(nfr.ipt4["filter/is-input"], wantRule) {
+		t.Errorf("loopback rule %q not installed for already-present addr; is-input=%q",
+			wantRule, nfr.ipt4["filter/is-input"])
 	}
 }
 
@@ -1791,7 +1812,7 @@ func TestSetOrphanScanGatedByAddrChange(t *testing.T) {
 
 	// First Set establishes steady state (scans, finds nothing to remove).
 	if err := lr.Set(&Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32"),
 		NetfilterMode: netfilterOff,
 	}); err != nil {
 		t.Fatalf("Set 1: %v", err)
@@ -1799,28 +1820,28 @@ func TestSetOrphanScanGatedByAddrChange(t *testing.T) {
 
 	// An orphan appears afterward. A route-only update leaves LocalAddrs
 	// unchanged, so the scan is skipped and the orphan stays in place.
-	fake.ips = append(fake.ips, "100.64.0.99/32 dev tailscale0")
+	fake.ips = append(fake.ips, "198.18.0.99/32 dev tailscale0")
 	slices.Sort(fake.ips)
 	if err := lr.Set(&Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32"),
 		Routes:        mustCIDRs("10.0.0.0/24"),
 		NetfilterMode: netfilterOff,
 	}); err != nil {
 		t.Fatalf("Set 2 (route-only): %v", err)
 	}
-	if !slices.Contains(fake.ips, "100.64.0.99/32 dev tailscale0") {
+	if !slices.Contains(fake.ips, "198.18.0.99/32 dev tailscale0") {
 		t.Errorf("orphan removed on a route-only update; scan should have been skipped; ips=%q", fake.ips)
 	}
 
 	// When LocalAddrs changes, the scan runs again and the orphan is removed.
 	if err := lr.Set(&Config{
-		LocalAddrs:    mustCIDRs("100.64.0.2/32"),
+		LocalAddrs:    mustCIDRs("198.18.0.2/32"),
 		Routes:        mustCIDRs("10.0.0.0/24"),
 		NetfilterMode: netfilterOff,
 	}); err != nil {
 		t.Fatalf("Set 3 (addr change): %v", err)
 	}
-	if slices.Contains(fake.ips, "100.64.0.99/32 dev tailscale0") {
+	if slices.Contains(fake.ips, "198.18.0.99/32 dev tailscale0") {
 		t.Errorf("orphan not removed after LocalAddrs change; ips=%q", fake.ips)
 	}
 }
@@ -1836,7 +1857,7 @@ func TestSetOrphanScanNotRetriedOnDuplicateLocalAddrs(t *testing.T) {
 	// LocalAddrs with a duplicate: cidrDiff dedups, so r.addrs ends up smaller
 	// than len(LocalAddrs).
 	dupCfg := &Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32", "100.64.0.1/32"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32", "198.18.0.1/32"),
 		NetfilterMode: netfilterOff,
 	}
 	if err := lr.Set(dupCfg); err != nil {
@@ -1845,12 +1866,12 @@ func TestSetOrphanScanNotRetriedOnDuplicateLocalAddrs(t *testing.T) {
 
 	// An orphan appears; re-applying the same (duplicated) LocalAddrs must not
 	// trigger a rescan, so the orphan stays.
-	fake.ips = append(fake.ips, "100.64.0.99/32 dev tailscale0")
+	fake.ips = append(fake.ips, "198.18.0.99/32 dev tailscale0")
 	slices.Sort(fake.ips)
 	if err := lr.Set(dupCfg); err != nil {
 		t.Fatalf("Set 2: %v", err)
 	}
-	if !slices.Contains(fake.ips, "100.64.0.99/32 dev tailscale0") {
+	if !slices.Contains(fake.ips, "198.18.0.99/32 dev tailscale0") {
 		t.Errorf("rescan ran for an unchanged (duplicated) LocalAddrs; ips=%q", fake.ips)
 	}
 }
@@ -1861,18 +1882,20 @@ func TestSetKeepsNonTailscaleAddrs(t *testing.T) {
 	lr, fake := newTestLinuxRouter(t)
 
 	keep := []string{
-		"192.168.1.5/24 dev tailscale0",        // non-Tailscale v4
-		"fe80::1/64 dev tailscale0",            // link-local v6
-		"100.115.92.5/32 dev tailscale0",       // ChromeOS VM range: in CGNAT, not a Tailscale IP
-		"100.63.0.1/32 dev tailscale0",         // just below CGNAT 100.64.0.0/10
-		"100.128.0.1/32 dev tailscale0",        // just above CGNAT
-		"fd7a:115c:a1e1::1/128 dev tailscale0", // adjacent to the Tailscale ULA /48, not in it
+		"192.168.1.5/24 dev tailscale0",         // not ours, v4
+		"fe80::1/64 dev tailscale0",             // link-local v6
+		"198.17.255.1/32 dev tailscale0",        // just below Inferscale's 198.18.0.0/15
+		"198.20.0.1/32 dev tailscale0",          // just above it
+		"fd2e:7c4a:9b11::1/128 dev tailscale0",  // next to Inferscale's ULA /48, not in it
+		"100.64.0.99/32 dev tailscale0",         // Tailscale's CGNAT range: Tailscale's, not ours
+		"fd7a:115c:a1e0::99/128 dev tailscale0", // Tailscale's ULA: Tailscale's, not ours
+		"100.115.92.5/32 dev tailscale0",        // ChromeOS VM range, which Tailscale carves out of its own
 	}
 	fake.ips = append([]string(nil), keep...)
 	slices.Sort(fake.ips)
 
 	cfg := &Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32"),
 		NetfilterMode: netfilterOff,
 	}
 	if err := lr.Set(cfg); err != nil {
@@ -1890,14 +1913,14 @@ func TestOrphanedAddrs(t *testing.T) {
 	p := netip.MustParsePrefix
 	// orphanedAddrs yields in kernelAddrs order, but compare as sets to be safe.
 	got := set.SetOf(slices.Collect(orphanedAddrs(
-		slices.Values([]netip.Prefix{p("100.64.0.1/32"), p("100.64.0.99/32"), p("fd7a:115c:a1e0::99/128")}),
-		[]netip.Prefix{p("100.64.0.1/32")},
+		slices.Values([]netip.Prefix{p("198.18.0.1/32"), p("198.18.0.99/32"), p("fd2e:7c4a:9b10::99/128")}),
+		[]netip.Prefix{p("198.18.0.1/32")},
 	)))
-	want := set.SetOf([]netip.Prefix{p("100.64.0.99/32"), p("fd7a:115c:a1e0::99/128")})
+	want := set.SetOf([]netip.Prefix{p("198.18.0.99/32"), p("fd2e:7c4a:9b10::99/128")})
 	if !got.Equal(want) {
 		t.Errorf("orphanedAddrs = %v; want %v", got.Slice(), want.Slice())
 	}
-	if got := slices.Collect(orphanedAddrs(slices.Values([]netip.Prefix(nil)), []netip.Prefix{p("100.64.0.1/32")})); got != nil {
+	if got := slices.Collect(orphanedAddrs(slices.Values([]netip.Prefix(nil)), []netip.Prefix{p("198.18.0.1/32")})); got != nil {
 		t.Errorf("orphanedAddrs(nil, ...) = %v; want nil", got)
 	}
 }
@@ -1914,7 +1937,7 @@ func TestGetV6AvailableNilNFR(t *testing.T) {
 	if r.getV6FilteringAvailable() {
 		t.Error("getV6FilteringAvailable() = true with nil nfr; want false")
 	}
-	if r.isDeletableAddr(netip.MustParseAddr("fd7a:115c:a1e0::99")) {
+	if r.isDeletableAddr(netip.MustParseAddr("fd2e:7c4a:9b10::99")) {
 		t.Error("isDeletableAddr(v6) = true with nil nfr; want false")
 	}
 }
@@ -1928,13 +1951,13 @@ func TestSetSkipsV6OrphansWhenV6Unavailable(t *testing.T) {
 	fake.nfr.(*fakeIPTablesRunner).noV6 = true
 
 	fake.ips = []string{
-		"100.64.0.99/32 dev tailscale0",         // CGNAT v4 orphan, removable
-		"fd7a:115c:a1e0::99/128 dev tailscale0", // ULA v6 orphan, not removable without v6
+		"198.18.0.99/32 dev tailscale0",         // Inferscale v4 orphan, removable
+		"fd2e:7c4a:9b10::99/128 dev tailscale0", // ULA v6 orphan, not removable without v6
 	}
 	slices.Sort(fake.ips)
 
 	cfg := &Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32"),
 		NetfilterMode: netfilterOff,
 	}
 	if err := lr.Set(cfg); err != nil {
@@ -1943,10 +1966,10 @@ func TestSetSkipsV6OrphansWhenV6Unavailable(t *testing.T) {
 
 	// The v4 orphan is removed; the v6 orphan is left in place rather than
 	// being treated as removed via a no-op delete.
-	if slices.Contains(fake.ips, "100.64.0.99/32 dev tailscale0") {
+	if slices.Contains(fake.ips, "198.18.0.99/32 dev tailscale0") {
 		t.Errorf("v4 orphan was not removed; ips=%q", fake.ips)
 	}
-	if !slices.Contains(fake.ips, "fd7a:115c:a1e0::99/128 dev tailscale0") {
+	if !slices.Contains(fake.ips, "fd2e:7c4a:9b10::99/128 dev tailscale0") {
 		t.Errorf("v6 orphan should be left alone when v6 is unavailable; ips=%q", fake.ips)
 	}
 }
@@ -1964,7 +1987,7 @@ func TestSetSkipsV6WhenInterfaceV6Unusable(t *testing.T) {
 	lr.interfaceV6Usable = func() bool { return false }
 
 	cfg := &Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32", "fd7a:115c:a1e0::1/128"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32", "fd2e:7c4a:9b10::1/128"),
 		NetfilterMode: netfilterOff,
 	}
 	if err := lr.Set(cfg); err != nil {
@@ -1973,10 +1996,10 @@ func TestSetSkipsV6WhenInterfaceV6Unusable(t *testing.T) {
 
 	// The v4 address is programmed; the v6 address is skipped rather than
 	// attempted (which would have errored on a v6-less interface).
-	if !slices.Contains(fake.ips, "100.64.0.1/32 dev tailscale0") {
+	if !slices.Contains(fake.ips, "198.18.0.1/32 dev tailscale0") {
 		t.Errorf("v4 address was not programmed; ips=%q", fake.ips)
 	}
-	if slices.Contains(fake.ips, "fd7a:115c:a1e0::1/128 dev tailscale0") {
+	if slices.Contains(fake.ips, "fd2e:7c4a:9b10::1/128 dev tailscale0") {
 		t.Errorf("v6 address should be skipped when the interface has no usable v6; ips=%q", fake.ips)
 	}
 }
@@ -1993,7 +2016,7 @@ func TestSetSnapshotsV6Usable(t *testing.T) {
 	}
 
 	cfg := &Config{
-		LocalAddrs:    mustCIDRs("100.64.0.1/32", "fd7a:115c:a1e0::1/128"),
+		LocalAddrs:    mustCIDRs("198.18.0.1/32", "fd2e:7c4a:9b10::1/128"),
 		Routes:        mustCIDRs("10.0.0.0/8", "fd00::/8"),
 		NetfilterMode: netfilterOff,
 	}
@@ -2011,8 +2034,8 @@ func TestSetSnapshotsV6Usable(t *testing.T) {
 func TestCleanUpRemovesAllTailscaleAddrs(t *testing.T) {
 	fake := NewFakeOS(t)
 	fake.ips = []string{
-		"100.64.0.1/32 dev tailscale0",         // CGNAT v4
-		"fd7a:115c:a1e0::1/128 dev tailscale0", // ULA v6
+		"198.18.0.1/32 dev tailscale0",         // Inferscale v4
+		"fd2e:7c4a:9b10::1/128 dev tailscale0", // ULA v6
 		"192.168.1.5/24 dev tailscale0",        // non-Tailscale, leave alone
 		"fe80::1/64 dev tailscale0",            // link-local v6, leave alone
 	}
@@ -2021,8 +2044,8 @@ func TestCleanUpRemovesAllTailscaleAddrs(t *testing.T) {
 	removeOrphanedAddrsForCleanup(t.Logf, fake, "tailscale0")
 
 	for _, gone := range []string{
-		"100.64.0.1/32 dev tailscale0",
-		"fd7a:115c:a1e0::1/128 dev tailscale0",
+		"198.18.0.1/32 dev tailscale0",
+		"fd2e:7c4a:9b10::1/128 dev tailscale0",
 	} {
 		if slices.Contains(fake.ips, gone) {
 			t.Errorf("Tailscale addr %q was not removed during cleanup; ips=%q", gone, fake.ips)
@@ -2044,34 +2067,35 @@ func TestCleanUpRemovesAllTailscaleAddrs(t *testing.T) {
 func TestCleanUpRemovesV6OrphanWithoutNetfilter(t *testing.T) {
 	fake := NewFakeOS(t)
 	fake.ips = []string{
-		"fd7a:115c:a1e0::99/128 dev tailscale0", // ULA v6 orphan
+		"fd2e:7c4a:9b10::99/128 dev tailscale0", // ULA v6 orphan
 	}
 
 	removeOrphanedAddrsForCleanup(t.Logf, fake, "tailscale0")
 
-	if slices.Contains(fake.ips, "fd7a:115c:a1e0::99/128 dev tailscale0") {
+	if slices.Contains(fake.ips, "fd2e:7c4a:9b10::99/128 dev tailscale0") {
 		t.Errorf("v6 orphan was not removed during cleanup; ips=%q", fake.ips)
 	}
 }
 
 // TestCleanUpKeepsNearRangeAddrs verifies the teardown sweep removes real
-// Tailscale orphans while leaving addresses at the edges of Tailscale's ranges
-// untouched. In particular the ChromeOS VM range is inside CGNAT 100.64.0.0/10
-// but excluded by tsaddr.IsTailscaleIP, so a naive CGNAT-prefix check would
-// wrongly delete it.
+// Inferscale orphans while leaving addresses at the edges of Inferscale's
+// ranges untouched, and addresses in Tailscale's ranges too: the two run on
+// one machine, and Inferscale must never remove a Tailscale address.
 func TestCleanUpKeepsNearRangeAddrs(t *testing.T) {
 	fake := NewFakeOS(t)
 	remove := []string{
-		"100.64.0.99/32 dev tailscale0",         // CGNAT v4 orphan
-		"fd7a:115c:a1e0::99/128 dev tailscale0", // Tailscale ULA v6 orphan
+		"198.18.0.99/32 dev tailscale0",         // Inferscale v4 orphan
+		"fd2e:7c4a:9b10::99/128 dev tailscale0", // Inferscale ULA v6 orphan
 	}
 	keep := []string{
-		"100.115.92.5/32 dev tailscale0",       // ChromeOS VM range: in CGNAT, not a Tailscale IP
-		"100.63.0.1/32 dev tailscale0",         // just below CGNAT
-		"100.128.0.1/32 dev tailscale0",        // just above CGNAT
-		"fd7a:115c:a1e1::1/128 dev tailscale0", // adjacent to the Tailscale ULA /48
-		"192.168.1.5/24 dev tailscale0",        // non-Tailscale v4
-		"fe80::1/64 dev tailscale0",            // link-local v6
+		"198.17.255.1/32 dev tailscale0",        // just below Inferscale's 198.18.0.0/15
+		"198.20.0.1/32 dev tailscale0",          // just above it
+		"fd2e:7c4a:9b11::1/128 dev tailscale0",  // next to Inferscale's ULA /48
+		"100.64.0.99/32 dev tailscale0",         // Tailscale's CGNAT range: Tailscale's, not ours
+		"fd7a:115c:a1e0::99/128 dev tailscale0", // Tailscale's ULA: Tailscale's, not ours
+		"100.115.92.5/32 dev tailscale0",        // ChromeOS VM range, which Tailscale carves out of its own
+		"192.168.1.5/24 dev tailscale0",         // not ours, v4
+		"fe80::1/64 dev tailscale0",             // link-local v6
 	}
 	fake.ips = append(append([]string(nil), remove...), keep...)
 	slices.Sort(fake.ips)
@@ -2091,24 +2115,25 @@ func TestCleanUpKeepsNearRangeAddrs(t *testing.T) {
 }
 
 // TestCleanUpOnlyTouchesTunInterface guards that the sweep is scoped to the
-// tunnel interface. 100.64.0.0/10 is shared ISP CGNAT space, so a host may carry
-// a non-Tailscale CGNAT address on its WAN/other interface; the sweep enumerates
-// and deletes only on tailscale0, so such an address on eth0 must never be
-// touched even though it's in the CGNAT range.
+// tunnel interface. 198.18.0.0/15 is the benchmarking range, which other
+// software borrows too (some proxies' fake-IP mode), so a host may carry such
+// an address on another interface; the sweep enumerates and deletes only on
+// the tunnel interface, so that address on eth0 must never be touched even
+// though it is in Inferscale's range.
 func TestCleanUpOnlyTouchesTunInterface(t *testing.T) {
 	fake := NewFakeOS(t)
 	fake.ips = []string{
-		"100.64.0.99/32 dev tailscale0", // our orphan on the tun -> removed
-		"100.64.0.5/32 dev eth0",        // someone else's CGNAT on WAN -> must survive
+		"198.18.0.99/32 dev tailscale0", // our orphan on the tun -> removed
+		"198.18.0.5/32 dev eth0",        // someone else's address in the range, on another interface -> must survive
 	}
 	slices.Sort(fake.ips)
 
 	removeOrphanedAddrsForCleanup(t.Logf, fake, "tailscale0")
 
-	if slices.Contains(fake.ips, "100.64.0.99/32 dev tailscale0") {
+	if slices.Contains(fake.ips, "198.18.0.99/32 dev tailscale0") {
 		t.Errorf("tailscale0 orphan was not removed; ips=%q", fake.ips)
 	}
-	if !slices.Contains(fake.ips, "100.64.0.5/32 dev eth0") {
-		t.Errorf("non-Tailscale CGNAT addr on eth0 was wrongly removed; ips=%q", fake.ips)
+	if !slices.Contains(fake.ips, "198.18.0.5/32 dev eth0") {
+		t.Errorf("an address in the range on eth0 was wrongly removed; ips=%q", fake.ips)
 	}
 }

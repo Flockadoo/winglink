@@ -1618,7 +1618,7 @@ var baseIPRules = []netlink.Rule{
 // on a UBNT device.
 //
 // The priority is the value represented here added to
-// r.ipPolicyPrefBase, which is usually 5200.
+// r.ipPolicyPrefBase, which is usually 5300.
 //
 // This represents an experiment that will be used to gather more information.
 // If this goes well, Tailscale may opt to use this for all of Linux.

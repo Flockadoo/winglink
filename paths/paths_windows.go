@@ -39,7 +39,7 @@ func ensureStateDirPermsWindows(dirPath string) error {
 		return os.ErrInvalid
 	}
 	base := strings.ToLower(filepath.Base(dirPath))
-	if base != "tailscale" && base != "inferscale" {
+	if base != "tailscale" && base != "winglink" {
 		return nil
 	}
 

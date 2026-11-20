@@ -29,9 +29,9 @@ func TestAddAndDeleteChains(t *testing.T) {
 
 	// Check that the chains were created.
 	tsChains := []struct{ table, chain string }{ // table/chain
-		{"filter", "is-input"},
-		{"filter", "is-forward"},
-		{"nat", "is-postrouting"},
+		{"filter", "wl-input"},
+		{"filter", "wl-forward"},
+		{"nat", "wl-postrouting"},
 	}
 
 	for _, proto := range []iptablesInterface{iptr.ipt4, iptr.ipt6} {
@@ -74,9 +74,9 @@ func TestAddAndDeleteHooks(t *testing.T) {
 
 	// Check that the rules were created.
 	tsRules := []fakeRule{ // table/chain/rule
-		{"filter", "INPUT", []string{"-j", "is-input"}},
-		{"filter", "FORWARD", []string{"-j", "is-forward"}},
-		{"nat", "POSTROUTING", []string{"-j", "is-postrouting"}},
+		{"filter", "INPUT", []string{"-j", "wl-input"}},
+		{"filter", "FORWARD", []string{"-j", "wl-forward"}},
+		{"nat", "POSTROUTING", []string{"-j", "wl-postrouting"}},
 	}
 
 	for _, proto := range []iptablesInterface{iptr.ipt4, iptr.ipt6} {
@@ -126,14 +126,14 @@ func TestAddAndDeleteBase(t *testing.T) {
 
 	// Check that the rules were created.
 	tsRulesV4 := []fakeRule{ // table/chain/rule
-		{"filter", "is-forward", []string{"-o", tunname, "-s", tsaddr.CGNATRange().String(), "-j", "DROP"}},
+		{"filter", "wl-forward", []string{"-o", tunname, "-s", tsaddr.CGNATRange().String(), "-j", "DROP"}},
 	}
 
 	tsRulesCommon := []fakeRule{ // table/chain/rule
-		{"filter", "is-input", []string{"-i", tunname, "-j", "ACCEPT"}},
-		{"filter", "is-forward", []string{"-i", tunname, "-j", "MARK", "--set-mark", tsconst.LinuxSubnetRouteMark + "/" + tsconst.LinuxFwmarkMask}},
-		{"filter", "is-forward", []string{"-m", "mark", "--mark", tsconst.LinuxSubnetRouteMark + "/" + tsconst.LinuxFwmarkMask, "-j", "ACCEPT"}},
-		{"filter", "is-forward", []string{"-o", tunname, "-j", "ACCEPT"}},
+		{"filter", "wl-input", []string{"-i", tunname, "-j", "ACCEPT"}},
+		{"filter", "wl-forward", []string{"-i", tunname, "-j", "MARK", "--set-mark", tsconst.LinuxSubnetRouteMark + "/" + tsconst.LinuxFwmarkMask}},
+		{"filter", "wl-forward", []string{"-m", "mark", "--mark", tsconst.LinuxSubnetRouteMark + "/" + tsconst.LinuxFwmarkMask, "-j", "ACCEPT"}},
+		{"filter", "wl-forward", []string{"-o", tunname, "-j", "ACCEPT"}},
 	}
 
 	// check that the rules were created for ipt4
@@ -193,10 +193,10 @@ func TestAddAndDelLoopbackRule(t *testing.T) {
 
 	// Check that the rules were created.
 	tsRulesV4 := fakeRule{ // table/chain/rule
-		"filter", "is-input", []string{"-i", "lo", "-s", fakeAddrV4.String(), "-j", "ACCEPT"}}
+		"filter", "wl-input", []string{"-i", "lo", "-s", fakeAddrV4.String(), "-j", "ACCEPT"}}
 
 	tsRulesV6 := fakeRule{ // table/chain/rule
-		"filter", "is-input", []string{"-i", "lo", "-s", fakeAddrV6.String(), "-j", "ACCEPT"}}
+		"filter", "wl-input", []string{"-i", "lo", "-s", fakeAddrV6.String(), "-j", "ACCEPT"}}
 
 	// check that the rules were created for ipt4 and ipt6
 	if exist, err := iptr.ipt4.Exists(tsRulesV4.table, tsRulesV4.chain, tsRulesV4.args...); err != nil {
@@ -211,7 +211,7 @@ func TestAddAndDelLoopbackRule(t *testing.T) {
 	}
 
 	// check that the rule is at the top
-	chain := "filter/is-input"
+	chain := "filter/wl-input"
 	if iptr.ipt4.(*fakeIPTables).n[chain][0] != strings.Join(tsRulesV4.args, " ") {
 		t.Errorf("v4 rule %s/%s/%s is not at the top", tsRulesV4.table, tsRulesV4.chain, strings.Join(tsRulesV4.args, " "))
 	}
@@ -253,7 +253,7 @@ func TestAddAndDelSNATRule(t *testing.T) {
 	}
 
 	rule := fakeRule{ // table/chain/rule
-		"nat", "is-postrouting", []string{"-m", "mark", "--mark", tsconst.LinuxSubnetRouteMark + "/" + tsconst.LinuxFwmarkMask, "-j", "MASQUERADE"},
+		"nat", "wl-postrouting", []string{"-m", "mark", "--mark", tsconst.LinuxSubnetRouteMark + "/" + tsconst.LinuxFwmarkMask, "-j", "MASQUERADE"},
 	}
 
 	// Add SNAT rule
@@ -383,12 +383,12 @@ func tailscaleSeesItsConnmarkRule(t *testing.T, ipt iptablesInterface) bool {
 	return false
 }
 
-// Inferscale's two connmark rules live in chains of its own in the mangle
-// table, is-prerouting and is-output, each reached by one jump at the top of
-// the built-in chain. Nothing else of Inferscale's is in the built-in
+// Winglink's two connmark rules live in chains of its own in the mangle
+// table, wl-prerouting and wl-output, each reached by one jump at the top of
+// the built-in chain. Nothing else of Winglink's is in the built-in
 // chains. Tailscale searches the listing of mangle/PREROUTING for the text
 // "ctmask 0xff0000" to decide whether its own rules are installed, and the
-// text of Inferscale's mask, 0xff000000, begins with Tailscale's: a rule of
+// text of Winglink's mask, 0xff000000, begins with Tailscale's: a rule of
 // ours in that chain made Tailscale skip its own.
 func TestAddAndDelConnmarkSaveRule(t *testing.T) {
 	type placed struct {
@@ -396,7 +396,7 @@ func TestAddAndDelConnmarkSaveRule(t *testing.T) {
 		args           []string
 	}
 	rules := []placed{
-		{"PREROUTING", "is-prerouting", []string{
+		{"PREROUTING", "wl-prerouting", []string{
 			"-m", "conntrack",
 			"--ctstate", "ESTABLISHED,RELATED",
 			"-m", "connmark",
@@ -406,7 +406,7 @@ func TestAddAndDelConnmarkSaveRule(t *testing.T) {
 			"--nfmask", "0xff000000",
 			"--ctmask", "0xff000000",
 		}},
-		{"OUTPUT", "is-output", []string{
+		{"OUTPUT", "wl-output", []string{
 			"-m", "conntrack",
 			"--ctstate", "NEW",
 			"-m", "mark",
@@ -464,7 +464,7 @@ func TestAddAndDelConnmarkSaveRule(t *testing.T) {
 				t.Errorf("%s: mangle/%s still exists", name, r.chain)
 			}
 			if count(ipt, r.builtin, []string{"-j", r.chain}) != 0 || count(ipt, r.builtin, r.args) != 0 {
-				t.Errorf("%s: something of Inferscale's is left in mangle/%s", name, r.builtin)
+				t.Errorf("%s: something of Winglink's is left in mangle/%s", name, r.builtin)
 			}
 		}
 	}
@@ -541,7 +541,7 @@ func TestAddAndDelConnmarkSaveRule(t *testing.T) {
 		}
 	})
 
-	// Tailscale starts after Inferscale. Its own check must not take anything
+	// Tailscale starts after Winglink. Its own check must not take anything
 	// of ours for its rule, so it adds its two rules, and ours stay.
 	t.Run("before_tailscale", func(t *testing.T) {
 		iptr := newFakeIPTablesRunner()
@@ -644,13 +644,13 @@ func TestAddAndDelCGNATRules(t *testing.T) {
 	}{
 		{
 			CGNATModeDrop, []fakeRule{
-				{"filter", "is-input", []string{"!", "-i", tunname, "-s", tsaddr.ChromeOSVMRange().String(), "-j", "RETURN"}},
-				{"filter", "is-input", []string{"!", "-i", tunname, "-s", tsaddr.CGNATRange().String(), "-j", "DROP"}},
+				{"filter", "wl-input", []string{"!", "-i", tunname, "-s", tsaddr.ChromeOSVMRange().String(), "-j", "RETURN"}},
+				{"filter", "wl-input", []string{"!", "-i", tunname, "-s", tsaddr.CGNATRange().String(), "-j", "DROP"}},
 			},
 		},
 		{
 			CGNATModeReturn, []fakeRule{
-				{"filter", "is-input", []string{"!", "-i", tunname, "-s", tsaddr.CGNATRange().String(), "-j", "RETURN"}},
+				{"filter", "wl-input", []string{"!", "-i", tunname, "-s", tsaddr.CGNATRange().String(), "-j", "RETURN"}},
 			},
 		},
 	}
@@ -708,7 +708,7 @@ func TestDelLoopbackRuleMissing(t *testing.T) {
 	if err := iptr.DelLoopbackRule(addr); err != nil {
 		t.Fatalf("DelLoopbackRule with rule present: %v", err)
 	}
-	if exists, err := iptr.ipt4.Exists("filter", "is-input", rule...); err != nil {
+	if exists, err := iptr.ipt4.Exists("filter", "wl-input", rule...); err != nil {
 		t.Fatal(err)
 	} else if exists {
 		t.Error("loopback rule still present after DelLoopbackRule")

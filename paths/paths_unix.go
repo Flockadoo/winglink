@@ -26,11 +26,11 @@ func statePath() string {
 	}
 	switch runtime.GOOS {
 	case "linux", "illumos", "solaris":
-		return "/var/lib/inferscale/inferscaled.state"
+		return "/var/lib/winglink/winglinkd.state"
 	case "freebsd", "openbsd":
 		return "/var/db/tailscale/tailscaled.state"
 	case "darwin":
-		return "/Library/Inferscale/inferscaled.state"
+		return "/Library/Winglink/winglinkd.state"
 	case "aix":
 		return "/var/tailscale/tailscaled.state"
 	default:
@@ -60,8 +60,8 @@ func stateFileUnix() string {
 		return ""
 	}
 
-	// For non-root users, fall back to $XDG_DATA_HOME/inferscale/*.
-	return filepath.Join(xdgDataHome(), "inferscale", "inferscaled.state")
+	// For non-root users, fall back to $XDG_DATA_HOME/winglink/*.
+	return filepath.Join(xdgDataHome(), "winglink", "winglinkd.state")
 }
 
 func xdgDataHome() string {
@@ -73,7 +73,7 @@ func xdgDataHome() string {
 
 func ensureStateDirPermsUnix(dir string) error {
 	base := filepath.Base(dir)
-	if base != "tailscale" && base != "inferscale" {
+	if base != "tailscale" && base != "winglink" {
 		return nil
 	}
 	fi, err := os.Stat(dir)

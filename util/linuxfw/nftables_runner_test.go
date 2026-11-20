@@ -641,11 +641,11 @@ func getTsChains(
 	var chainInput, chainForward, chainPostrouting *nftables.Chain
 	for _, chain := range chains {
 		switch chain.Name {
-		case "ts-input":
+		case chainNameInput:
 			chainInput = chain
-		case "ts-forward":
+		case chainNameForward:
 			chainForward = chain
-		case "ts-postrouting":
+		case chainNamePostrouting:
 			chainPostrouting = chain
 		}
 	}
@@ -1450,10 +1450,11 @@ func TestGetOrCreateChainNilHooknum(t *testing.T) {
 		Family: nftables.TableFamilyIPv4,
 		Name:   "ts-filter-test",
 	})
-	// Add a ts- chain without hooknum/priority (regular chain), simulating
-	// the broken state returned by a kernel without nftables support.
+	// Add one of our chains without hooknum/priority (regular chain),
+	// simulating the broken state returned by a kernel without nftables
+	// support.
 	conn.AddChain(&nftables.Chain{
-		Name:  "ts-input",
+		Name:  chainNameInput,
 		Table: table,
 	})
 	if err := conn.Flush(); err != nil {
@@ -1463,7 +1464,7 @@ func TestGetOrCreateChainNilHooknum(t *testing.T) {
 	// Now try getOrCreateChain expecting a base chain with hooknum/priority.
 	_, err := getOrCreateChain(conn, chainInfo{
 		table:         table,
-		name:          "ts-input",
+		name:          chainNameInput,
 		chainType:     nftables.ChainTypeFilter,
 		chainHook:     nftables.ChainHookInput,
 		chainPriority: nftables.ChainPriorityFilter,

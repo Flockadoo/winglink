@@ -27,7 +27,14 @@ jobs:
       - name: Firewall and router tests
         run: go test -count=1 ./util/linuxfw/ ./wgengine/router/...
 
-      # Three router tests need root and a TUN device, and skip without them.
+      # The names the fork gives the daemon, its interface and its files.
+      # Only these tests: the rest of these packages are not yet brought up
+      # to the fork.
+      - name: Name tests
+        run: go test -count=1 -run '^TestWinglink' ./paths/ ./cmd/tailscaled/
+
+      # Three router tests need root and a TUN device, and the nftables name
+      # test needs root; they skip without it.
       # They run in a network namespace of their own, so they cannot touch the
       # runner's network.
       - name: Router tests that need root
@@ -36,5 +43,28 @@ jobs:
           go test -c -o "$RUNNER_TEMP/osrouter.test" ./wgengine/router/osrouter/
           sudo unshare -n "$RUNNER_TEMP/osrouter.test" -test.count=1 -test.v \
             -test.run '^(TestRuleDeletedEvent|TestDelRouteIdempotent|TestAddRemoveRules)$' | tee "$RUNNER_TEMP/root-tests.txt"
+          go test -c -o "$RUNNER_TEMP/linuxfw.test" ./util/linuxfw/
+          sudo unshare -n "$RUNNER_TEMP/linuxfw.test" -test.count=1 -test.v \
+            -test.run '^TestWinglinkNFTablesNames$' | tee -a "$RUNNER_TEMP/root-tests.txt"
           # A skip here means the tests did not run: fail.
           ! grep -q -- '--- SKIP' "$RUNNER_TEMP/root-tests.txt"
+
+  # The names from before Winglink (Flockadoo rebrand plan, stage 2). No
+  # tracked file's content or path may contain them. The pattern is written
+  # so that this file does not match it.
+  names:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Old names
+        run: |
+          set -u
+          pattern='infer(oute|scale|bid)|sent[n]l'
+          found=0
+          if git grep -n -I -i -E "$pattern"; then found=1; fi
+          if git ls-files | grep -i -E "$pattern"; then found=1; fi
+          if [ "$found" = 1 ]; then
+            echo "::error::Old names found above. Use the names in docs/naming.md (internal-docs)."
+            exit 1
+          fi

@@ -71,7 +71,7 @@ jobs:
     # Every push to main publishes the binaries twice: to edge, overwritten
     # each time as before, and to a release of its own, v0.0.<run number>,
     # never overwritten, with a SHA256SUMS file. Clients pin the versioned
-    # release and the checksums (flockadoo plan item S1).
+    # release and the checksums (the client's reliability plan, item S1).
     needs: build
     runs-on: ubuntu-latest
     outputs:
@@ -117,9 +117,9 @@ jobs:
           gh release upload edge dist/winglink-* dist/winglinkd-* --clobber
 
   pin:
-    # Opens a pull request in flockadoo that pins this release. The
-    # app's token can push a branch and open a pull request there and nothing
-    # else; only a maintainer merges it.
+    # Opens a pull request in the client (Flockadoo/flockadoo) that pins this
+    # release. The app's token can push a branch and open a pull request there
+    # and nothing else; only a maintainer merges it.
     needs: publish
     runs-on: ubuntu-latest
     steps:

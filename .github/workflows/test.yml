@@ -1,6 +1,6 @@
 name: Test
 
-# The firewall and routing code is where Inferscale differs most from
+# The firewall and routing code is where Winglink differs most from
 # Tailscale (chain names, packet marks, routing table, address ranges), and it
 # runs as root on providers' machines. Its tests run on every pull request and
 # on main. Other packages join this list as their tests are brought up to the

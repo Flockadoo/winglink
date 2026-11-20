@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	chainNameForward     = "is-forward"
-	chainNameInput       = "is-input"
-	chainNamePostrouting = "is-postrouting"
+	chainNameForward     = "wl-forward"
+	chainNameInput       = "wl-input"
+	chainNamePostrouting = "wl-postrouting"
 )
 
 // chainTypeRegular is an nftables chain that does not apply to a hook.
@@ -257,15 +257,15 @@ func (n *nftablesRunner) EnsureSNATForDst(src, dst netip.Addr) error {
 // forwarding packets from an endpoint with higher MTU in an environment where
 // path MTU discovery is expected to not work (such as the proxies created by
 // the Tailscale Kubernetes operator). ClampMSSToPMTU creates a new base-chain
-// is-clamp in the filter
+// wl-clamp in the filter
 // table with accept policy and priority -150. In practice, this means that for
 // SYN packets the clamp rule in this chain will likely run first and accept the
 // packet. This is fine because 1) nftables run ALL chains with the same hook
 // type unless a rule in one of them drops the packet and 2) this chain does not
 // have functionality to drop the packet- so in practice a matching clamp rule
 // will always be followed by the custom tailscale filtering rules in the other
-// chains attached to the filter hook (FORWARD, is-forward).
-// We do not want to place the clamping rule into FORWARD/is-forward chains
+// chains attached to the filter hook (FORWARD, wl-forward).
+// We do not want to place the clamping rule into FORWARD/wl-forward chains
 // because wgengine populates those chains with rules that contain accept
 // verdicts that would cause no further procesing within that chain. This
 // functionality is currently invoked from outside wgengine (containerboot), so
@@ -281,10 +281,10 @@ func (n *nftablesRunner) ClampMSSToPMTU(tun string, addr netip.Addr) error {
 		return fmt.Errorf("error ensuring filter table: %w", err)
 	}
 
-	// ensure is-clamp chain exists
+	// ensure wl-clamp chain exists
 	fwChain, err := getOrCreateChain(n.conn, chainInfo{
 		table:         filterTable,
-		name:          "is-clamp",
+		name:          "wl-clamp",
 		chainType:     nftables.ChainTypeFilter,
 		chainHook:     nftables.ChainHookForward,
 		chainPriority: nftables.ChainPriorityMangle,
@@ -453,10 +453,10 @@ func getChainFromTable(c *nftables.Conn, table *nftables.Table, name string) (*n
 	return nil, errorChainNotFound{table.Name, name}
 }
 
-// isTSChain reports whether `name` begins with "is-" (and is thus a
+// isTSChain reports whether `name` begins with "wl-" (and is thus a
 // Tailscale-managed chain).
 func isTSChain(name string) bool {
-	return strings.HasPrefix(name, "is-")
+	return strings.HasPrefix(name, "wl-")
 }
 
 // createChainIfNotExist creates a chain with the given name in the given table
@@ -608,7 +608,7 @@ type NetfilterRunner interface {
 	// interface), so both endpoints negotiate an MSS that fits the tun MTU.
 	ClampMSSToPMTU(tun string, addr netip.Addr) error
 
-	// AddMagicsockPortRule adds a rule to the is-input chain to accept
+	// AddMagicsockPortRule adds a rule to the wl-input chain to accept
 	// incoming traffic on the specified port, to allow magicsock to
 	// communicate.
 	AddMagicsockPortRule(port uint16, network string) error
@@ -617,7 +617,7 @@ type NetfilterRunner interface {
 	// if it exists.
 	DelMagicsockPortRule(port uint16, network string) error
 
-	// AddExternalCGNATRules adds rules to the is-input chain to deal with
+	// AddExternalCGNATRules adds rules to the wl-input chain to deal with
 	// traffic from the CGNAT range that arrives on non-Tailscale network
 	// interfaces.
 	AddExternalCGNATRules(mode CGNATMode, tunname string) error
@@ -927,7 +927,7 @@ func (n *nftablesRunner) getTables() []*nftable {
 }
 
 // AddChains creates custom Tailscale chains in netfilter via nftables
-// if the is-chain doesn't already exist.
+// if the wl-chain doesn't already exist.
 func (n *nftablesRunner) AddChains() error {
 	polAccept := nftables.ChainPolicyAccept
 	for _, table := range n.getTables() {
@@ -983,8 +983,8 @@ func (n *nftablesRunner) AddChains() error {
 // running on a system that doesn't support nftables. See
 // createDummyPostroutingChains.
 const (
-	tsDummyChainName = "is-test-postrouting"
-	tsDummyTableName = "is-test-nat"
+	tsDummyChainName = "wl-test-postrouting"
+	tsDummyTableName = "wl-test-nat"
 )
 
 // createDummyPostroutingChains creates dummy postrouting chains in netfilter
@@ -1611,7 +1611,7 @@ func (n *nftablesRunner) DelMagicsockPortRule(port uint16, network string) error
 	return nil
 }
 
-// AddExternalCGNATRules adds rules to the is-input chain to deal with
+// AddExternalCGNATRules adds rules to the wl-input chain to deal with
 // traffic from the CGNAT range that arrives on non-Tailscale network
 // interfaces.
 func (n *nftablesRunner) AddExternalCGNATRules(mode CGNATMode, tunname string) error {
@@ -2277,7 +2277,7 @@ func (n *nftablesRunner) AddConnmarkSaveRule() error {
 		if err == nil {
 			rules, _ := conn.GetRules(preroutingChain.Table, preroutingChain)
 			for _, rule := range rules {
-				if string(rule.UserData) == "is-connmark-restore" {
+				if string(rule.UserData) == "wl-connmark-restore" {
 					// Rules already exist, skip adding
 					return nil
 				}
@@ -2312,7 +2312,7 @@ func (n *nftablesRunner) AddConnmarkSaveRule() error {
 			Table:    mangleTable,
 			Chain:    preroutingChain,
 			Exprs:    makeConnmarkRestoreExprs(),
-			UserData: []byte("is-connmark-restore"),
+			UserData: []byte("wl-connmark-restore"),
 		})
 
 		// Get or create OUTPUT chain
@@ -2333,7 +2333,7 @@ func (n *nftablesRunner) AddConnmarkSaveRule() error {
 			Table:    mangleTable,
 			Chain:    outputChain,
 			Exprs:    makeConnmarkSaveExprs(),
-			UserData: []byte("is-connmark-save"),
+			UserData: []byte("wl-connmark-save"),
 		})
 	}
 
@@ -2359,7 +2359,7 @@ func (n *nftablesRunner) DelConnmarkSaveRule() error {
 		if err == nil {
 			rules, _ := conn.GetRules(preroutingChain.Table, preroutingChain)
 			for _, rule := range rules {
-				if string(rule.UserData) == "is-connmark-restore" {
+				if string(rule.UserData) == "wl-connmark-restore" {
 					conn.DelRule(rule)
 					break
 				}
@@ -2371,7 +2371,7 @@ func (n *nftablesRunner) DelConnmarkSaveRule() error {
 		if err == nil {
 			rules, _ := conn.GetRules(outputChain.Table, outputChain)
 			for _, rule := range rules {
-				if string(rule.UserData) == "is-connmark-save" {
+				if string(rule.UserData) == "wl-connmark-save" {
 					conn.DelRule(rule)
 					break
 				}
@@ -2401,11 +2401,11 @@ func cleanupChain(logf logger.Logf, conn *nftables.Conn, table *nftables.Table, 
 
 	tsChain, err := getChainFromTable(conn, table, tsChainName)
 	if err != nil && !errors.Is(err, errorChainNotFound{table.Name, tsChainName}) {
-		logf("cleanup: did not find is-chain: %s", err)
+		logf("cleanup: did not find wl-chain: %s", err)
 	}
 
 	if tsChain != nil {
-		// flush and delete is-chain
+		// flush and delete wl-chain
 		conn.FlushChain(tsChain)
 		conn.DelChain(tsChain)
 		err = conn.Flush()
@@ -2428,7 +2428,7 @@ func NfTablesCleanUp(logf logger.Logf) {
 
 	for _, table := range tables {
 		// These table names were used briefly in 1.48.0.
-		if table.Name == "is-filter" || table.Name == "is-nat" {
+		if table.Name == "wl-filter" || table.Name == "wl-nat" {
 			conn.DelTable(table)
 			if err := conn.Flush(); err != nil {
 				logf("cleanup: flush delete table %s: %s", table.Name, err)

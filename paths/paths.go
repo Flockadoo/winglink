@@ -47,17 +47,17 @@ func WindowsDevTailscaledSocket() string {
 	if err != nil {
 		return ""
 	}
-	return `\\.\pipe\inferscale-` + u.Uid
+	return `\\.\pipe\winglink-` + u.Uid
 }
 
 // DefaultTailscaledSocket returns the path to the tailscaled Unix socket
 // or the empty string if there's no reasonable default.
 func DefaultTailscaledSocket() string {
 	if runtime.GOOS == "windows" {
-		return WindowsProtectedPipePrefix + `Inferscale\inferscaled`
+		return WindowsProtectedPipePrefix + `Winglink\winglinkd`
 	}
 	if runtime.GOOS == "darwin" {
-		return "/var/run/inferscale/inferscaled.sock"
+		return "/var/run/winglink/winglinkd.sock"
 	}
 	if runtime.GOOS == "plan9" {
 		return "/srv/tailscaled.sock"
@@ -83,7 +83,7 @@ func DefaultTailscaledSocket() string {
 		return "/tmp/tailscale/tailscaled.sock"
 	}
 	if fi, err := os.Stat("/var/run"); err == nil && fi.IsDir() {
-		return "/var/run/inferscale/inferscaled.sock"
+		return "/var/run/winglink/winglinkd.sock"
 	}
 	return "tailscaled.sock"
 }
@@ -105,7 +105,7 @@ func DefaultTailscaledStateFile() string {
 		return f()
 	}
 	if runtime.GOOS == "windows" {
-		return filepath.Join(os.Getenv("ProgramData"), "Inferscale", "inferscaled.state")
+		return filepath.Join(os.Getenv("ProgramData"), "Winglink", "winglinkd.state")
 	}
 	return ""
 }

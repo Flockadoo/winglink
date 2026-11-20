@@ -48,22 +48,22 @@ jobs:
           if [ "$GOOS" = "windows" ]; then
             ext=".exe"
           fi
-          ./build_dist.sh --box -o "out/inferscale-${GOOS}-${GOARCH}${ext}" ./cmd/tailscaled
-          cp "out/inferscale-${GOOS}-${GOARCH}${ext}" "out/inferscaled-${GOOS}-${GOARCH}${ext}"
+          ./build_dist.sh --box -o "out/winglink-${GOOS}-${GOARCH}${ext}" ./cmd/tailscaled
+          cp "out/winglink-${GOOS}-${GOARCH}${ext}" "out/winglinkd-${GOOS}-${GOARCH}${ext}"
           if [ "$GOOS" = "windows" ]; then
             curl -fsSL -o wintun.zip https://www.wintun.net/builds/wintun-0.14.1.zip
             echo "07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51  wintun.zip" | sha256sum -c
             unzip -p wintun.zip wintun/bin/amd64/wintun.dll > out/wintun.dll
-            zip -j "out/inferscale-windows-amd64.zip" \
-              "out/inferscale-windows-amd64.exe" \
-              "out/inferscaled-windows-amd64.exe" \
+            zip -j "out/winglink-windows-amd64.zip" \
+              "out/winglink-windows-amd64.exe" \
+              "out/winglinkd-windows-amd64.exe" \
               out/wintun.dll
-            rm -f out/inferscale-windows-amd64.exe out/inferscaled-windows-amd64.exe out/wintun.dll wintun.zip
+            rm -f out/winglink-windows-amd64.exe out/winglinkd-windows-amd64.exe out/wintun.dll wintun.zip
           fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: inferscale-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: winglink-${{ matrix.goos }}-${{ matrix.goarch }}
           path: out/*
           if-no-files-found: error
 
@@ -71,7 +71,7 @@ jobs:
     # Every push to main publishes the binaries twice: to edge, overwritten
     # each time as before, and to a release of its own, v0.0.<run number>,
     # never overwritten, with a SHA256SUMS file. Clients pin the versioned
-    # release and the checksums (inferoute-client plan item S1).
+    # release and the checksums (flockadoo plan item S1).
     needs: build
     runs-on: ubuntu-latest
     outputs:
@@ -88,7 +88,7 @@ jobs:
         run: |
           set -eu
           cd dist
-          sha256sum inferscale-* inferscaled-* > SHA256SUMS
+          sha256sum winglink-* winglinkd-* > SHA256SUMS
           cat SHA256SUMS
 
       - id: version
@@ -103,8 +103,8 @@ jobs:
           set -eu
           # A version is never reused or overwritten: no --clobber, and an
           # existing release of this name stops the job.
-          gh release create "$VERSION" dist/inferscale-* dist/inferscaled-* dist/SHA256SUMS \
-            --target "$GITHUB_SHA" --title "Inferscale $VERSION" --latest=false \
+          gh release create "$VERSION" dist/winglink-* dist/winglinkd-* dist/SHA256SUMS \
+            --target "$GITHUB_SHA" --title "Winglink $VERSION" --latest=false \
             --notes "Built from $GITHUB_SHA by $RUN_URL"
 
       - name: Publish edge release
@@ -114,10 +114,10 @@ jobs:
           set -eu
           find dist -type f -print
           gh release view edge >/dev/null 2>&1 || gh release create edge --notes "edge" --latest=false
-          gh release upload edge dist/inferscale-* dist/inferscaled-* --clobber
+          gh release upload edge dist/winglink-* dist/winglinkd-* --clobber
 
   pin:
-    # Opens a pull request in inferoute-client that pins this release. The
+    # Opens a pull request in flockadoo that pins this release. The
     # app's token can push a branch and open a pull request there and nothing
     # else; only a maintainer merges it.
     needs: publish
@@ -128,8 +128,8 @@ jobs:
         with:
           app-id: ${{ vars.CLIENT_PIN_APP_ID }}
           private-key: ${{ secrets.CLIENT_PIN_APP_PRIVATE_KEY }}
-          owner: Inferoute
-          repositories: inferoute-client
+          owner: Flockadoo
+          repositories: flockadoo
           permission-contents: write
           permission-pull-requests: write
 
@@ -141,7 +141,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: Inferoute/inferoute-client
+          repository: Flockadoo/flockadoo
           ref: main
           token: ${{ steps.app.outputs.token }}
           path: client
@@ -158,9 +158,9 @@ jobs:
           set -eu
           jq -n --arg v "$VERSION" --arg c "$GITHUB_SHA" --rawfile sums SHA256SUMS \
             '{version: $v, commit: $c, sha256: ($sums | split("\n") | map(select(length > 0) | split("  ") | {(.[1]): .[0]}) | add)}' \
-            > client/pkg/inferscale/release.json
+            > client/pkg/winglink/release.json
           {
-            echo "Pins Inferscale $VERSION in the client."
+            echo "Pins Winglink $VERSION in the client."
             echo
             echo "- Release: $RELEASE_URL"
             echo "- Source commit: $COMMIT_URL"
@@ -173,14 +173,14 @@ jobs:
             cat SHA256SUMS
             echo '```'
             echo
-            echo "Opened by the Inferscale release workflow. Review it against the release above and merge only if you expected it. The Inferscale pin check compares every file with the release."
+            echo "Opened by the Winglink release workflow. Review it against the release above and merge only if you expected it. The Winglink pin check compares every file with the release."
           } > body.md
           cd client
-          branch="inferscale-pin/$VERSION"
+          branch="winglink-pin/$VERSION"
           git config user.name "$SLUG[bot]"
           git config user.email "$SLUG[bot]@users.noreply.github.com"
           git checkout -b "$branch"
-          git add pkg/inferscale/release.json
-          git commit -m "Pin Inferscale $VERSION"
+          git add pkg/winglink/release.json
+          git commit -m "Pin Winglink $VERSION"
           git push origin "$branch"
-          gh pr create --base main --head "$branch" --title "Pin Inferscale $VERSION" --body-file ../body.md
+          gh pr create --base main --head "$branch" --title "Pin Winglink $VERSION" --body-file ../body.md

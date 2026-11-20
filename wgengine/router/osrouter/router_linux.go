@@ -1558,7 +1558,7 @@ var (
 	// Not 52. Tailscale owns table 52, and each daemon flushes the
 	// table it thinks is its own. Stay under 256: busybox `ip` treats
 	// table numbers as 8-bit.
-	tailscaleRouteTable = newRouteTable("inferscale", 87)
+	tailscaleRouteTable = newRouteTable("winglink", 87)
 )
 
 // baseIPRules are the policy routing rules that Tailscale uses, when not

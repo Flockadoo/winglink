@@ -75,7 +75,7 @@ func defaultTunName() string {
 	case "openbsd":
 		return "tun"
 	case "windows":
-		return "Inferscale"
+		return "Winglink"
 	case "darwin":
 		// "utun" is recognized by wireguard-go/tun/tun_darwin.go
 		// as a magic value that uses/creates any free number.
@@ -88,7 +88,7 @@ func defaultTunName() string {
 		if buildfeatures.HasSynology && buildfeatures.HasNetstack && distro.Get() == distro.Synology {
 			// Try TUN, but fall back to userspace networking if needed.
 			// See https://github.com/tailscale/tailscale-synology/issues/35
-			return "inferscale0,userspace-networking"
+			return "winglink0,userspace-networking"
 		}
 		if buildfeatures.HasNetstack && distro.Get() == distro.Crostini {
 			// cros-garcon NULL-derefs on cold-boot netlink interface
@@ -101,7 +101,7 @@ func defaultTunName() string {
 			return "userspace-networking"
 		}
 	}
-	return "inferscale0"
+	return "winglink0"
 }
 
 // defaultPort returns the default UDP port to listen on for disco+wireguard.
@@ -169,8 +169,8 @@ func shouldRunCLI() bool {
 		// Not linked in with the "ts_include_cli" build tag.
 		return false
 	}
-	if len(os.Args) > 0 && strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe") == "inferscale" {
-		// The binary was named (or hardlinked) as "inferscale".
+	if len(os.Args) > 0 && strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe") == "winglink" {
+		// The binary was named (or hardlinked) as "winglink".
 		return true
 	}
 	if envknob.Bool("TS_BE_CLI") {
